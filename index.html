@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" id="vp" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache">
+<title>TO&amp;FRO Logistics | Domestic &amp; International Courier</title>
+<meta name="description" content="TO&FRO – reliable domestic and international courier solutions for individuals and businesses in Hyderabad and across India.">
+<link rel="icon" type="image/png" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0F0B62;
+    --ink:#14164A;
+    --text:#2A2C4E;
+    --muted:#4A4D6A;
+    --orange:#FF6600;
+    --orange-2:#FF7A1C;
+    --orange-dark:#EE5A00;
+    --peach:#FFEBDD;
+    --hero-bg:#EFF1FE;
+    --page-bg:#F7F8FD;
+    --line:#E3E6F3;
+    --footer:#14164A;
+    --radius:14px;
+    --shadow:0 10px 30px rgba(28,34,96,.08), 0 2px 6px rgba(28,34,96,.05);
+    --container:1376px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;scroll-padding-top:84px;overflow-x:hidden;-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulation}
+  body{font-family:'Inter',system-ui,sans-serif;color:var(--text);background:var(--page-bg);-webkit-font-smoothing:antialiased;overflow-x:hidden;overflow-x:clip;min-width:0;width:100%}
+  section,header,footer,main{max-width:100%}
+  a,button,input,select,textarea{touch-action:manipulation}
+  img{display:block;max-width:100%}
+  a{color:inherit;text-decoration:none}
+  .container{width:min(var(--container), calc(100% - 64px));margin-inline:auto}
+  h1,h2,h3,.display{font-family:'Outfit',sans-serif;color:var(--navy)}
+
+  /* ---------- Buttons ---------- */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:46px;padding:0 26px;border-radius:7px;font-family:'Inter',sans-serif;font-weight:600;font-size:18px;letter-spacing:-.2px;cursor:pointer;border:0;transition:transform .18s ease, box-shadow .18s ease, background .18s ease;white-space:nowrap}
+  .btn svg{width:18px;height:18px;flex:none}
+  .btn-primary{color:#fff;background:linear-gradient(180deg,var(--orange-2),var(--orange-dark));box-shadow:0 6px 16px rgba(255,102,0,.28)}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 10px 22px rgba(255,102,0,.35)}
+  .btn-outline{color:var(--navy);background:#fff;border:1.5px solid var(--navy)}
+  .btn-outline:hover{background:var(--navy);color:#fff}
+
+  /* ---------- Header ---------- */
+  .header{position:sticky;top:0;z-index:50;background:#fff;box-shadow:0 1px 0 rgba(20,22,74,.04),0 4px 14px rgba(20,22,74,.04)}
+  .header .container{display:flex;align-items:center;height:74px;gap:24px}
+  .brand img{height:39px;width:auto}
+  .nav{display:flex;align-items:center;gap:56px;margin-left:auto;margin-right:auto;padding-left:70px}
+  .nav a{position:relative;font-size:18px;font-weight:500;color:#25284F;padding:8px 0;transition:color .2s}
+  .nav a::after{content:"";position:absolute;left:0;right:0;bottom:-8px;height:4px;border-radius:4px;background:var(--orange);transform:scaleX(0);transition:transform .25s}
+  .nav a:hover{color:var(--navy)}
+  .nav a.active{font-weight:700;color:var(--navy)}
+  .nav a.active::after{transform:scaleX(1)}
+  .header-right{display:flex;align-items:center;gap:28px}
+  .phone{display:flex;align-items:center;gap:10px;font-weight:600;font-size:18px;color:var(--navy)}
+  .phone svg{width:20px;height:20px;color:var(--navy)}
+  .header .btn{height:47px;padding:0 22px}
+  .menu-toggle{display:none;background:none;border:0;width:44px;height:44px;margin-left:auto;cursor:pointer;color:var(--navy)}
+  .menu-toggle svg{width:28px;height:28px}
+
+  /* ---------- Hero ---------- */
+  /* Hero art width tracks the space right of the text column, so it scales from laptops to ultra-wide */
+  .hero{--gutter:max(32px, calc(50vw - 688px));--art-w:min(1500px, calc(100vw - var(--gutter) - 465px));position:relative;background:linear-gradient(180deg,#EEF0FE 0%,#F0F2FE 75%,var(--page-bg) 100%);overflow:hidden}
+  .hero-art{position:absolute;top:0;right:0;width:min(1500px, calc(100% - max(32px, 50% - 688px) - 465px));pointer-events:none}
+  .hero-art img{width:100%;height:auto}
+  .hero .container{position:relative;min-height:calc(var(--art-w) * .438 + 90px);padding-top:clamp(36px, 3.8vw, 58px);padding-bottom:90px}
+  .hero-copy{position:relative;z-index:2;max-width:520px}
+  .eyebrow{display:flex;align-items:center;gap:20px;white-space:nowrap;font-size:15px;font-weight:700;letter-spacing:3.8px;color:var(--navy);text-transform:uppercase}
+  .eyebrow::before{content:"";width:4px;height:22px;background:var(--orange);border-radius:1px}
+  .hero h1{margin-top:24px;font-size:clamp(52px, 5.2vw, 80px);line-height:.93;font-weight:800;letter-spacing:-2.6px}
+  .hero h1 span{color:var(--orange)}
+  .hero p{margin-top:28px;font-size:17px;line-height:1.32;color:var(--text);max-width:470px}
+  .hero p strong{color:var(--navy);font-weight:700}
+  .hero-ctas{display:flex;flex-wrap:wrap;gap:16px 22px;margin-top:26px}
+  .hero-ctas .btn-outline{min-width:170px}
+
+  /* orange swoosh on the right edge */
+  .swoosh{position:absolute;right:0;top:calc(var(--art-w) * .438 - 15px);width:170px;height:200px;z-index:1;pointer-events:none}
+
+  /* ---------- Tracking card ---------- */
+  .tracking{position:relative;z-index:5;margin-top:-82px}
+  .track-card{width:min(1245px,100%);margin-inline:auto;background:#fff;border-radius:16px;box-shadow:var(--shadow);display:flex;align-items:center;gap:24px;padding:24px 40px;min-height:117px}
+  .track-icon{width:70px;height:70px;flex:none}
+  .track-title{display:flex;align-items:center;gap:20px;padding-right:12px}
+  .track-title .divider{width:1px;height:50px;background:var(--line)}
+  .track-title h2{font-size:28px;font-weight:700;letter-spacing:-.4px;white-space:nowrap}
+  .track-form{display:flex;flex:1;gap:24px;margin-left:16px}
+  .track-input{position:relative;flex:1}
+  .track-input svg{position:absolute;left:20px;top:50%;transform:translateY(-50%);width:26px;height:26px;color:#5A5E84}
+  .track-input input{width:100%;height:54px;border:1.5px solid #C9CDE0;border-radius:7px;padding:0 20px 0 72px;font:inherit;font-size:17px;color:var(--ink);background:#fff;outline:none;transition:border-color .2s, box-shadow .2s}
+  .track-input input::placeholder{color:#7A7D96}
+  .track-input input:focus{border-color:var(--orange);box-shadow:0 0 0 4px rgba(255,102,0,.12)}
+  .track-form .btn{height:52px;padding:0 30px}
+  .track-result{display:none;width:min(1245px,100%);margin:14px auto 0;padding:14px 20px;border-radius:10px;background:#fff;border-left:4px solid var(--orange);box-shadow:var(--shadow);font-size:15px;color:var(--text)}
+  .track-result.show{display:block}
+  .track-result b{color:var(--navy)}
+
+  /* ---------- Services ---------- */
+  .services{padding:88px 0 64px}
+  .services .container{display:grid;grid-template-columns:280px 1fr;gap:48px;align-items:center}
+  .label{display:flex;align-items:center;gap:18px;font-size:13px;font-weight:700;letter-spacing:2.6px;color:var(--navy);text-transform:uppercase}
+  .label::before{content:"";width:40px;height:4px;border-radius:4px;background:var(--orange)}
+  .section-head h2{margin-top:20px;font-size:44px;line-height:1.05;font-weight:700;letter-spacing:-1px}
+  .section-head p{margin-top:18px;font-size:19px;line-height:1.5;color:var(--muted)}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+  .card{position:relative;background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:28px 28px 32px;min-height:210px;transition:transform .2s ease, box-shadow .2s ease}
+  .card:hover{transform:translateY(-4px);box-shadow:0 18px 40px rgba(28,34,96,.12)}
+  .card-top{display:flex;align-items:center;gap:16px}
+  .card-top img{width:92px;height:92px;border-radius:18px;flex:none}
+  .card h3{font-size:20px;font-weight:700;letter-spacing:-.3px}
+  .card p{margin-top:22px;font-size:16px;line-height:1.5;color:var(--text);padding-right:56px}
+  .card .arrow{position:absolute;right:24px;bottom:24px;width:43px;height:27px;border-radius:7px;background:linear-gradient(180deg,var(--orange-2),var(--orange-dark));display:grid;place-items:center;color:#fff;transition:transform .2s}
+  .card .arrow svg{width:16px;height:16px}
+  .card:hover .arrow{transform:translateX(3px)}
+
+  /* ---------- About ---------- */
+  .about{padding:96px 0}
+  .about .container{display:grid;grid-template-columns:280px 1fr;gap:48px;align-items:start}
+  .about-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+  .feature{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:32px}
+  .feature .ico{width:52px;height:52px;border-radius:14px;background:var(--peach);display:grid;place-items:center;color:var(--orange)}
+  .feature .ico svg{width:26px;height:26px}
+  .feature h3{margin-top:20px;font-size:20px;font-weight:700}
+  .feature p{margin-top:12px;font-size:15.5px;line-height:1.55;color:var(--muted)}
+
+  /* ---------- Contact ---------- */
+  .contact{padding:96px 0 112px}
+  .contact .container{display:grid;grid-template-columns:280px 1fr;gap:48px;align-items:start}
+  .contact-wrap{display:grid;grid-template-columns:1fr 1.15fr;gap:32px}
+  .contact-list{display:grid;gap:16px}
+  .contact-item{display:flex;gap:16px;align-items:center;background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:22px 24px}
+  .contact-item .ico{width:46px;height:46px;border-radius:12px;background:var(--peach);color:var(--orange);display:grid;place-items:center;flex:none}
+  .contact-item .ico svg{width:22px;height:22px}
+  .contact-item small{display:block;font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.3px}
+  .contact-item a,.contact-item span{font-weight:600;color:var(--navy);font-size:16px;line-height:1.4}
+  .contact-form{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:32px;display:grid;gap:16px}
+  .contact-form .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .contact-form label{display:grid;gap:6px;font-size:14px;font-weight:600;color:var(--navy)}
+  .contact-form input,.contact-form select,.contact-form textarea{font:inherit;font-size:15px;color:var(--ink);border:1.5px solid #D5D9EA;border-radius:8px;padding:12px 14px;outline:none;background:#fff;transition:border-color .2s, box-shadow .2s}
+  .contact-form textarea{min-height:110px;resize:vertical}
+  .contact-form input:focus,.contact-form select:focus,.contact-form textarea:focus{border-color:var(--orange);box-shadow:0 0 0 4px rgba(255,102,0,.12)}
+  .contact-form .btn{justify-self:start}
+
+  /* ---------- Footer ---------- */
+  .footer{position:relative;background:var(--footer);color:#fff;overflow:hidden}
+  .footer .container{position:relative;z-index:1;display:flex;align-items:center;min-height:124px;padding:22px 0}
+  .footer .brand img{height:42px}
+  .footer .container{justify-content:space-between;gap:28px}
+  .f-sep{width:1px;height:46px;background:rgba(255,255,255,.35);flex:none}
+  .f-item{display:flex;align-items:center;gap:20px;flex:none;white-space:nowrap}
+  .f-item svg{width:30px;height:30px;flex:none;color:#fff}
+  .f-item b{display:block;font-size:15px;font-weight:600}
+  .f-item a,.f-item span{font-size:16px;font-weight:500;line-height:1.5}
+  .f-item address{font-style:normal;font-size:12.5px;line-height:1.55;color:#E7E8F3}
+  .f-item a:hover{color:var(--orange-2)}
+  .f-curve{position:absolute;right:0;bottom:0;width:270px;height:124px;z-index:0}
+  .copyright{position:relative;z-index:1;border-top:1px solid rgba(255,255,255,.1);font-size:13px;color:#B9BBD6;padding:14px 0}
+
+  /* reveal */
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease, transform .6s ease}
+  .reveal.in{opacity:1;transform:none}
+
+  /* ---------- Responsive ---------- */
+  /* Laptops / small desktops */
+  @media (max-width:1380px){
+    .nav{gap:clamp(22px, 2.6vw, 56px);padding-left:clamp(0px, 2vw, 70px)}
+    .footer .container{display:grid;grid-template-columns:repeat(4, auto);justify-content:space-between;gap:22px 32px}
+    .footer .brand{grid-column:1 / -1}
+    .f-sep{display:none}
+    .services .container,.about .container,.contact .container{grid-template-columns:1fr;gap:48px}
+    .section-head h2 br,.section-head p br{display:none}
+  }
+  @media (max-width:1200px){
+    .phone span{display:none}
+    .header-right{gap:18px}
+    .eyebrow{letter-spacing:2.6px;font-size:14px}
+    .hero-copy{max-width:470px}
+    .track-card{flex-wrap:wrap;row-gap:18px}
+    .track-form{flex-basis:100%;margin-left:0}
+    .card h3{font-size:20px}
+  }
+  /* Tablets (portrait + landscape) and below: stacked hero, hamburger menu */
+  @media (max-width:1024px){
+    .menu-toggle{display:grid;place-items:center;margin-left:12px;margin-right:-8px}
+    .header-right .btn{display:none}
+    .phone span{display:inline}
+    .phone{font-size:17px}
+    .header-right{margin-left:auto}
+    .nav{position:absolute;top:74px;left:0;right:0;flex-direction:column;gap:0;padding:8px 32px 18px;background:#fff;box-shadow:0 14px 24px rgba(20,22,74,.08);display:none;margin:0;max-height:calc(100vh - 74px);max-height:calc(100dvh - 74px);overflow-y:auto}
+    .nav.open{display:flex}
+    .nav a{width:100%;padding:14px 0;border-bottom:1px solid var(--line)}
+    .nav a::after{display:none}
+    .nav a.active{color:var(--orange)}
+    .hero{display:flex;flex-direction:column}
+    .hero .container{min-height:0;padding-top:48px;padding-bottom:24px}
+    .hero-copy{max-width:640px}
+    .hero h1{font-size:clamp(40px, 8.4vw, 72px)}
+    .hero-art{position:relative;width:100%;top:0;margin-top:-6px}
+    .swoosh{display:none}
+    .tracking{margin-top:-40px}
+    .cards,.about-grid{grid-template-columns:1fr 1fr}
+    .cards > :last-child:nth-child(odd),.about-grid > :last-child:nth-child(odd){grid-column:1 / -1}
+    .contact-wrap{grid-template-columns:1fr}
+    .footer .container{grid-template-columns:1fr 1fr}
+    .f-curve{width:180px;height:90px}
+  }
+  /* Tablet, laptop, and desktop: keep Services through Contact centered,
+     the same width as the tracking card, so left and right margins match. */
+  @media (min-width:641px){
+    .services .container,
+    .about .container,
+    .contact .container{
+      width:min(1245px, calc(100% - 64px));
+      margin-inline:auto;
+    }
+  }
+  /* Large phones / small tablets */
+  @media (max-width:640px){
+    .container,.services .container,.about .container,.contact .container{width:calc(100% - 32px)}
+    .header .container{height:64px}
+    .nav{top:64px;padding:4px 16px 14px;max-height:calc(100vh - 64px);max-height:calc(100dvh - 64px)}
+    html{scroll-padding-top:72px}
+    .brand img{height:30px}
+    .phone{width:40px;height:40px;justify-content:center;border-radius:50%;background:var(--peach)}
+    .phone svg{color:var(--orange)}
+    .phone span{display:none}
+    .menu-toggle{margin-left:6px}
+    .hero .container{padding-top:34px}
+    .eyebrow{font-size:11px;letter-spacing:2px;gap:10px;white-space:normal}
+    .hero h1{margin-top:18px;letter-spacing:-1.4px}
+    .hero p{font-size:16px;margin-top:20px}
+    .hero-ctas{flex-direction:column;gap:12px}
+    .hero-ctas .btn{width:100%}
+    .btn{font-size:17px}
+    .tracking{margin-top:-24px}
+    .track-card{padding:20px 18px;gap:16px}
+    .track-title{gap:14px;padding-right:0}
+    .track-title h2{font-size:clamp(19px, 6vw, 24px);white-space:normal}
+    .track-title .divider{display:none}
+    .track-icon{width:52px;height:52px}
+    .track-form{flex-direction:column;gap:12px}
+    .track-input svg{left:14px;width:22px;height:22px}
+    .track-input input{padding-left:46px;font-size:16px;height:52px}
+    .track-form .btn{width:100%}
+    .services{padding:64px 0 40px}
+    .about{padding:72px 0}
+    .contact{padding:64px 0 72px}
+    .cards,.about-grid{grid-template-columns:1fr}
+    .section-head h2{font-size:clamp(30px, 9vw, 38px)}
+    .section-head p{font-size:17px}
+    .card{min-height:0}
+    .card-top img{width:76px;height:76px;border-radius:16px}
+    .contact-form{padding:20px}
+    .contact-form .row{grid-template-columns:1fr}
+    .contact-form .btn{justify-self:stretch}
+    .contact-form input,.contact-form select,.contact-form textarea{font-size:16px}
+    .contact-item{padding:16px}
+    .contact-item a,.contact-item span{word-break:break-word}
+    .footer .container{grid-template-columns:1fr;padding:30px 0 70px}
+    .f-item{white-space:normal}
+    .f-item a{word-break:break-all}
+  }
+  /* Small phones (iPhone SE, Galaxy Fold folded) */
+  @media (max-width:360px){
+    .brand img{height:26px}
+    .eyebrow{letter-spacing:1.4px}
+    .card-top{gap:12px}
+    .card-top img{width:64px;height:64px}
+    .card h3{font-size:18px}
+    .card p{padding-right:48px}
+  }
+  /* Short landscape phones */
+  @media (max-height:500px) and (orientation:landscape){
+    .header{position:relative}
+    html{scroll-padding-top:0}
+  }
+  /* Touch devices: no hover lift */
+  @media (hover:none){
+    .card:hover,.btn-primary:hover{transform:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    .reveal{opacity:1;transform:none;transition:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= HEADER ================= -->
+<header class="header">
+  <div class="container">
+    <a href="#home" class="brand" aria-label="TO&FRO home"><img src="assets/logo.png" alt="TO&amp;FRO"></a>
+    <nav class="nav" id="nav">
+      <a href="#home" class="active">Home</a>
+      <a href="#services">Services</a>
+      <a href="#tracking">Tracking</a>
+      <a href="#about">About Us</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <div class="header-right">
+      <a href="tel:+919010077370" class="phone" aria-label="Call +91 9010077370">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>
+        <span>+91 9010077370</span>
+      </a>
+      <a href="#tracking" class="btn btn-primary">Track Shipment
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+    </div>
+    <button class="menu-toggle" id="menuToggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+<!-- ================= HERO ================= -->
+<section class="hero" id="home">
+  <div class="container">
+    <div class="hero-copy">
+      <div class="eyebrow">Domestic &amp; International Logistics</div>
+      <h1>Your Parcels.<br>Our <span>Priority.</span></h1>
+      <p>Reliable courier solutions for individuals and businesses. Send documents and parcels across India and around the world with <strong>TO&amp;FRO.</strong></p>
+      <div class="hero-ctas">
+        <a href="#tracking" class="btn btn-primary">Track Your Parcel
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a href="#contact" class="btn btn-outline">Get in Touch</a>
+      </div>
+    </div>
+  </div>
+  <div class="hero-art"><img src="assets/hero-illustration.webp" alt="TO&amp;FRO courier delivery agent holding a parcel beside a delivery van, with Charminar, city skyline and a global route map" width="1982" height="868"></div>
+  <svg class="swoosh" viewBox="0 0 170 200" preserveAspectRatio="none" aria-hidden="true">
+    <defs><linearGradient id="sw" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8A1E"/><stop offset="1" stop-color="#FF6600"/></linearGradient></defs>
+    <path d="M170 0 C 120 40, 40 60, 0 110 C 30 130, 60 120, 90 112 C 120 104, 150 100, 170 102 Z" fill="url(#sw)"/>
+  </svg>
+</section>
+
+<!-- ================= TRACKING ================= -->
+<section class="tracking" id="tracking">
+  <div class="container">
+    <div class="track-card">
+      <div class="track-title">
+        <svg class="track-icon" viewBox="0 0 70 70" aria-hidden="true">
+          <defs><linearGradient id="hx" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF8A26"/><stop offset="1" stop-color="#F25C00"/></linearGradient></defs>
+          <path d="M30 3.5a10 10 0 0 1 10 0l20.3 11.7a10 10 0 0 1 5 8.7v23.4a10 10 0 0 1-5 8.7L40 66.5a10 10 0 0 1-10 0L9.7 55.8a10 10 0 0 1-5-8.7V23.9a10 10 0 0 1 5-8.7z" fill="url(#hx)"/>
+          <g fill="none" stroke="#fff" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M35 18 50 26v18l-15 8-15-8V26z"/><path d="M20 26l15 8 15-8M35 34v18"/><path d="M27.5 22l15 8"/>
+          </g>
+        </svg>
+        <span class="divider"></span>
+        <h2>Track Your Shipment</h2>
+      </div>
+      <form class="track-form" id="trackForm" novalidate>
+        <label class="track-input">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.5-4.5"/></svg>
+          <input type="text" id="awb" name="awb" placeholder="Enter AWB / Tracking Number" aria-label="AWB or tracking number" autocomplete="off">
+        </label>
+        <button type="submit" class="btn btn-primary">Track Shipment
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </form>
+    </div>
+    <div class="track-result" id="trackResult" role="status" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- ================= SERVICES ================= -->
+<section class="services" id="services">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="label">Our Services</div>
+      <h2>Moving what <br>matters.</h2>
+      <p>Courier services designed <br>around your shipping needs.</p>
+    </div>
+    <div class="cards">
+      <a href="#contact" class="card reveal" data-service="Domestic Courier">
+        <div class="card-top"><img src="assets/icon-domestic.png" alt="" width="92" height="92"><h3>Domestic Courier</h3></div>
+        <p>Send parcels and documents to destinations across India.</p>
+        <span class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+      <a href="#contact" class="card reveal" data-service="International Courier">
+        <div class="card-top"><img src="assets/icon-international.png" alt="" width="92" height="92"><h3>International Courier</h3></div>
+        <p>Ship documents and parcels internationally with support.</p>
+        <span class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+      <a href="#contact" class="card reveal" data-service="Business Shipping">
+        <div class="card-top"><img src="assets/icon-business.png" alt="" width="92" height="92"><h3>Business Shipping</h3></div>
+        <p>Courier solutions for businesses with regular shipping needs.</p>
+        <span class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ABOUT ================= -->
+<section class="about" id="about">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="label">About Us</div>
+      <h2>Delivering <br>with care.</h2>
+      <p>A Hyderabad-based courier partner for people and businesses.</p>
+    </div>
+    <div class="about-grid">
+      <div class="feature reveal">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg></div>
+        <h3>Across India</h3>
+        <p>Documents and parcels sent from Hyderabad to cities and towns across the country.</p>
+      </div>
+      <div class="feature reveal">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></div>
+        <h3>Around the World</h3>
+        <p>International courier with guidance on packing, paperwork and delivery timelines.</p>
+      </div>
+      <div class="feature reveal">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+        <h3>Personal Support</h3>
+        <p>Talk to a real person for bookings, tracking updates and regular business shipments.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CONTACT ================= -->
+<section class="contact" id="contact">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="label">Contact</div>
+      <h2>Get in <br>touch.</h2>
+      <p>Call, email or drop by our office in Nizampet.</p>
+    </div>
+    <div class="contact-wrap">
+      <div class="contact-list">
+        <div class="contact-item reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg></div>
+          <div><small>International Courier</small><a href="tel:+918886333604">+91 8886333604</a></div>
+        </div>
+        <div class="contact-item reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg></div>
+          <div><small>Domestic Courier</small><a href="tel:+919010077370">+91 9010077370</a></div>
+        </div>
+        <div class="contact-item reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></div>
+          <div><small>Email</small><a href="mailto:tonfrologistics@gmail.com">tonfrologistics@gmail.com</a></div>
+        </div>
+        <div class="contact-item reveal">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg></div>
+          <div><small>Office</small><span>3-147/c, Maruthi Complex, Nizampet Main Road, Near Bata Showroom, Hyderabad – 500090</span></div>
+        </div>
+      </div>
+      <form class="contact-form reveal" id="contactForm">
+        <div class="row">
+          <label>Name<input type="text" name="name" required placeholder="Your name"></label>
+          <label>Phone<input type="tel" name="phone" required placeholder="+91"></label>
+        </div>
+        <label>Service
+          <select name="service" id="serviceSelect">
+            <option>Domestic Courier</option>
+            <option>International Courier</option>
+            <option>Business Shipping</option>
+            <option>Tracking Enquiry</option>
+          </select>
+        </label>
+        <label>Message<textarea name="message" placeholder="Pickup location, destination, parcel details…"></textarea></label>
+        <button type="submit" class="btn btn-primary">Send Enquiry
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </form>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- ================= FOOTER ================= -->
+<footer class="footer">
+  <svg class="f-curve" viewBox="0 0 270 124" preserveAspectRatio="none" aria-hidden="true">
+    <defs><linearGradient id="fc" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#FF7A10"/><stop offset="1" stop-color="#FF6600"/></linearGradient></defs>
+    <path d="M270 0 C 250 60, 200 100, 30 118 L 0 124 L 270 124 Z" fill="url(#fc)"/>
+  </svg>
+  <div class="container">
+    <a href="#home" class="brand"><img src="assets/logo-white.png" alt="TO&amp;FRO"></a>
+    <span class="f-sep"></span>
+    <div class="f-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+      <div><b>International Courier</b><a href="tel:+918886333604">+91 8886333604</a></div>
+    </div>
+    <span class="f-sep"></span>
+    <div class="f-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>
+      <div><b>Domestic Courier</b><a href="tel:+919010077370">+91 9010077370</a></div>
+    </div>
+    <span class="f-sep"></span>
+    <div class="f-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>
+      <address>3-147/c, Maruthi Complex,<br>Nizampet Main Road, Near Bata Showroom,<br>Hyderabad – 500090</address>
+    </div>
+    <span class="f-sep"></span>
+    <div class="f-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="m3 6 9 7 9-7"/></svg>
+      <a href="mailto:tonfrologistics@gmail.com">tonfrologistics@gmail.com</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Browsers restore a previous pinch/double-tap zoom on reload, which makes the page look
+  // shifted sideways. If the page opens zoomed in, briefly cap the scale at 1 to reset it,
+  // then re-allow pinch-zoom for accessibility.
+  (function resetRestoredZoom(){
+    const vp = document.getElementById('vp');
+    const base = vp.getAttribute('content');
+    const reset = () => {
+      if (!window.visualViewport || visualViewport.scale <= 1.01) return;
+      vp.setAttribute('content', base + ', minimum-scale=1, maximum-scale=1');
+      setTimeout(() => { vp.setAttribute('content', base); window.scrollTo({left:0, top:window.scrollY}); }, 300);
+    };
+    window.addEventListener('pageshow', reset);
+    window.addEventListener('load', reset);
+  })();
+
+  // Mobile menu
+  const nav = document.getElementById('nav');
+  const toggle = document.getElementById('menuToggle');
+  toggle.addEventListener('click', () => {
+    const open = nav.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', open);
+  });
+  const closeMenu = () => { nav.classList.remove('open'); toggle.setAttribute('aria-expanded', false); };
+  nav.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMenu));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+  document.addEventListener('click', e => { if (!e.target.closest('.header')) closeMenu(); });
+  window.matchMedia('(min-width:1025px)').addEventListener('change', e => { if (e.matches) closeMenu(); });
+
+  // Active nav link on scroll
+  const links = [...nav.querySelectorAll('a')];
+  const sections = links.map(a => document.querySelector(a.getAttribute('href')));
+  function setActive(){
+    const y = window.scrollY + 140;
+    let idx = 0;
+    sections.forEach((s, i) => { if (s && s.offsetTop <= y) idx = i; });
+    if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 4) idx = sections.length - 1;
+    links.forEach((l, i) => l.classList.toggle('active', i === idx));
+  }
+  window.addEventListener('scroll', setActive, {passive:true}); setActive();
+
+  // Tracking
+  const trackForm = document.getElementById('trackForm');
+  const awb = document.getElementById('awb');
+  const result = document.getElementById('trackResult');
+  trackForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const v = awb.value.trim();
+    result.classList.add('show');
+    if (!v) { result.innerHTML = 'Please enter your <b>AWB / Tracking Number</b>.'; awb.focus(); return; }
+    const safe = v.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+    result.innerHTML = `Looking up <b>${safe}</b>… For an instant status update call <a href="tel:+919010077370"><b>+91 9010077370</b></a> (Domestic) or <a href="tel:+918886333604"><b>+91 8886333604</b></a> (International).`;
+  });
+
+  // Service cards pre-select the enquiry form
+  const serviceSelect = document.getElementById('serviceSelect');
+  document.querySelectorAll('.card[data-service]').forEach(c =>
+    c.addEventListener('click', () => { serviceSelect.value = c.dataset.service; }));
+
+  // Contact form -> email
+  document.getElementById('contactForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const body = `Name: ${f.get('name')}\nPhone: ${f.get('phone')}\nService: ${f.get('service')}\n\n${f.get('message')}`;
+    window.location.href = `mailto:tonfrologistics@gmail.com?subject=${encodeURIComponent('Enquiry – ' + f.get('service'))}&body=${encodeURIComponent(body)}`;
+  });
+
+  // Reveal on scroll
+  const io = new IntersectionObserver(entries => entries.forEach(en => {
+    if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); }
+  }), {threshold:.12});
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
+</body>
+</html>
