@@ -780,7 +780,7 @@
   async function trackOnSite(awbNumber){
     const urls = location.protocol === 'file:'
       ? ['http://127.0.0.1:5510/api/track']
-      : ['/api/track', '/api/track.php'];
+      : ['/api/track', '/api/track-php.php'];
     if (location.protocol !== 'file:' && location.host !== 'www.tnfexpress.krackbot.com') {
       urls.push('https://www.tnfexpress.krackbot.com/api/track');
     }
