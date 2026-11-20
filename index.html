@@ -96,9 +96,61 @@
   .track-input input::placeholder{color:#7A7D96}
   .track-input input:focus{border-color:var(--orange);box-shadow:0 0 0 4px rgba(255,102,0,.12)}
   .track-form .btn{height:52px;padding:0 30px}
-  .track-result{display:none;width:min(1245px,100%);margin:14px auto 0;padding:14px 20px;border-radius:10px;background:#fff;border-left:4px solid var(--orange);box-shadow:var(--shadow);font-size:15px;color:var(--text)}
+  .track-result{display:none;width:min(1245px,100%);margin:16px auto 0;border-radius:16px;background:#fff;box-shadow:var(--shadow);font-size:15px;color:var(--text);overflow:hidden}
   .track-result.show{display:block}
   .track-result b{color:var(--navy)}
+  .track-note{display:flex;align-items:flex-start;gap:12px;padding:18px 22px;line-height:1.5;border-left:4px solid var(--orange)}
+  .track-note a{color:var(--navy)}
+  .track-loading{align-items:center;color:var(--muted)}
+  .spinner{width:18px;height:18px;flex:none;border-radius:50%;border:2px solid var(--peach);border-top-color:var(--orange);animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .track-banner{display:flex;align-items:center;justify-content:space-between;gap:28px;padding:22px 28px 20px;background:linear-gradient(180deg,#fff,#FFF8F3);border-bottom:1px solid var(--line)}
+  .track-banner.ok{background:linear-gradient(180deg,#fff,#F3FBF6)}
+  .track-banner.bad{background:linear-gradient(180deg,#fff,#FFF6F5)}
+  .track-kicker{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .track-carrier{display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:999px;background:var(--peach);color:var(--orange-dark);font-size:12px;font-weight:700;letter-spacing:.3px}
+  .track-banner.ok .track-carrier{background:#E5F6EC;color:#0E7A45}
+  .track-banner.bad .track-carrier{background:#FDECEC;color:#B42318}
+  .track-live{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+  .track-state{font-family:'Outfit',sans-serif;font-size:32px;line-height:1;color:var(--navy)}
+  .track-state.ok{color:#0E7A45}
+  .track-state.move{color:var(--orange-dark)}
+  .track-state.bad{color:#B42318}
+  .track-alert{margin-top:8px;font-size:13px;color:#B42318;font-weight:600}
+  .track-steps{display:flex;align-items:flex-start;flex:1;max-width:520px;padding-top:2px}
+  .track-step{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;font-size:11px;font-weight:600;line-height:1.25;color:#8B8EAA}
+  .track-step::before{content:"";position:absolute;top:9px;right:50%;left:-50%;height:2px;background:#E4E7F2}
+  .track-step:first-child::before{display:none}
+  .track-step .mark{position:relative;z-index:1;width:20px;height:20px;border-radius:50%;background:#fff;border:2px solid #D4D8E8}
+  .track-step.done,.track-step.current{color:var(--navy)}
+  .track-step.done::before,.track-step.current::before{background:var(--orange)}
+  .track-step.done .mark,.track-step.current .mark{background:var(--orange);border-color:var(--orange)}
+  .track-step.current .mark{box-shadow:0 0 0 4px rgba(255,102,0,.18)}
+  .track-banner.ok .track-step.done::before{background:#0E7A45}
+  .track-banner.ok .track-step.done .mark,.track-banner.ok .track-step.current .mark{background:#0E7A45;border-color:#0E7A45;box-shadow:none}
+  .track-facts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:18px 22px 4px}
+  .track-fact{background:var(--page-bg);border-radius:12px;padding:14px 16px;min-width:0}
+  .track-fact small{display:block;margin-bottom:4px;font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--muted)}
+  .track-fact b{display:block;font-size:15px;font-weight:600;line-height:1.35;color:var(--navy);overflow-wrap:anywhere}
+  .track-journey{padding:6px 22px 8px}
+  .track-journey h3{padding:14px 4px 2px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+  .track-events{list-style:none;max-height:340px;overflow:auto;padding:10px 8px 16px 4px}
+  .track-events li{display:grid;grid-template-columns:18px 108px 1fr;gap:0 14px;position:relative;padding:0 8px}
+  .track-events li::before{content:"";position:absolute;left:16px;top:10px;bottom:-6px;width:2px;background:#E4E7F2}
+  .track-events li:last-child::before{display:none}
+  .track-events .node{width:12px;height:12px;margin:5px 3px 0;border-radius:50%;background:#fff;border:2px solid #C9CEE0;position:relative;z-index:1}
+  .track-events li:first-child .node{background:var(--orange);border-color:var(--orange);box-shadow:0 0 0 4px rgba(255,102,0,.16)}
+  .track-events time{padding-top:1px;font-size:12px;line-height:1.35;color:var(--muted)}
+  .track-events time b{display:block;color:var(--navy);font-size:13px;font-weight:600}
+  .track-events li > div{padding-bottom:18px}
+  .track-events strong{display:block;color:var(--navy);font-size:15px;font-weight:600;line-height:1.35}
+  .track-events span{display:block;margin-top:2px;color:var(--muted);font-size:13px;line-height:1.4}
+  .track-form .btn[disabled]{opacity:.7;cursor:progress}
+  @media (max-width:900px){
+    .track-banner{flex-direction:column;align-items:stretch;gap:18px}
+    .track-steps{max-width:none}
+    .track-facts{grid-template-columns:1fr}
+  }
 
   /* ---------- Services ---------- */
   .services{padding:88px 0 64px}
@@ -247,6 +299,14 @@
     .track-input svg{left:14px;width:22px;height:22px}
     .track-input input{padding-left:46px;font-size:16px;height:52px}
     .track-form .btn{width:100%}
+    .track-banner{padding:18px}
+    .track-state{font-size:26px}
+    .track-step{font-size:10px}
+    .track-facts,.track-journey{padding-left:14px;padding-right:14px}
+    .track-events li{grid-template-columns:18px 1fr}
+    .track-events time,.track-events li > div{grid-column:2}
+    .track-events time{display:flex;gap:8px;padding-bottom:2px}
+    .track-events time b{display:inline}
     .services{padding:64px 0 40px}
     .about{padding:72px 0}
     .contact{padding:64px 0 72px}
@@ -547,17 +607,104 @@
   }
   window.addEventListener('scroll', setActive, {passive:true}); setActive();
 
-  // Tracking
+  // Tracking across DHL, FedEx, UPS, Blue Dart, Delhivery and Courier Wala
   const trackForm = document.getElementById('trackForm');
   const awb = document.getElementById('awb');
   const result = document.getElementById('trackResult');
-  trackForm.addEventListener('submit', e => {
+  const trackButton = trackForm.querySelector('button');
+  const escapeHtml = value => String(value ?? '').replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+  const phoneHelp = 'For help call <a href="tel:+919010077370"><b>+91 9010077370</b></a> (Domestic) or <a href="tel:+918886333604"><b>+91 8886333604</b></a> (International).';
+  const journeyLabels = ['Booked', 'Picked up', 'In transit', 'Out for delivery', 'Delivered'];
+  function journeyIndex(status, tone){
+    const text = String(status || '').toLowerCase();
+    if (tone === 'bad') return -1;
+    if (tone === 'ok' || /deliver|signed/.test(text)) return 4;
+    if (/out for/.test(text)) return 3;
+    if (tone === 'move' || /transit|depart|ship|dispatch|bag|trip|arriv/.test(text)) return 2;
+    if (/pick|receiv|origin|manifest|book|order/.test(text)) return 1;
+    return 0;
+  }
+  function splitWhen(value){
+    const match = String(value || '').trim().match(/^(\d{2}-\d{2}-\d{4})\s+(.+)$/);
+    return match ? {date: match[1], clock: match[2]} : {date: String(value || ''), clock: ''};
+  }
+  function placeName(value){
+    return String(value || '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  function lead(value){
+    const text = placeName(value);
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
+  }
+  function splitScan(event){
+    const description = String(event.description || '');
+    const at = description.lastIndexOf(' at ');
+    if (at > 0) return {title: lead(description.slice(0, at)), place: placeName(description.slice(at + 4))};
+    const place = event.location && !description.includes(event.location) ? placeName(event.location) : '';
+    return {title: lead(description), place};
+  }
+  function renderTrack(data){
+    if (!data || !data.ok) {
+      const name = data && data.carrierName ? `<b>${escapeHtml(data.carrierName)}</b> ` : '';
+      return `<p class="track-note">${name}${escapeHtml((data && data.message) || 'Tracking is unavailable right now.')} ${phoneHelp}</p>`;
+    }
+    const shipment = data.shipment;
+    const tone = shipment.tone || 'wait';
+    const step = journeyIndex(shipment.status, tone);
+    const steps = tone === 'bad' ? '' : `<div class="track-steps">${journeyLabels.map((label, index) => {
+      const classes = [index < step ? 'done' : '', index === step ? 'current' : '', tone === 'ok' && index <= step ? 'done' : ''].filter(Boolean).join(' ');
+      return `<div class="track-step ${classes}"><span class="mark"></span>${escapeHtml(label)}</div>`;
+    }).join('')}</div>`;
+    const facts = [
+      ['Tracking number', shipment.awb],
+      ['Current location', placeName(shipment.location)],
+      ['Estimated delivery', shipment.eta]
+    ].filter(([, value]) => value).map(([label, value]) => `<div class="track-fact"><small>${label}</small><b>${escapeHtml(value)}</b></div>`).join('');
+    const events = (shipment.events || []).map(event => {
+      const when = splitWhen(event.time);
+      const scan = splitScan(event);
+      return `<li>
+        <span class="node"></span>
+        <time>${when.date ? `<b>${escapeHtml(when.date)}</b>` : ''}${escapeHtml(when.clock)}</time>
+        <div><strong>${escapeHtml(scan.title)}</strong>${scan.place ? `<span>${escapeHtml(scan.place)}</span>` : ''}</div>
+      </li>`;
+    }).join('');
+    return `
+      <div class="track-banner ${escapeHtml(tone)}">
+        <div>
+          <div class="track-kicker">
+            <span class="track-carrier">${escapeHtml(shipment.carrierName)}</span>
+            <span class="track-live">Live status</span>
+          </div>
+          <div class="track-state ${escapeHtml(tone)}">${escapeHtml(shipment.status)}</div>
+          ${tone === 'bad' ? '<p class="track-alert">This shipment needs attention.</p>' : ''}
+        </div>
+        ${steps}
+      </div>
+      ${facts ? `<div class="track-facts">${facts}</div>` : ''}
+      ${events ? `<div class="track-journey"><h3>Shipment history</h3><ol class="track-events">${events}</ol></div>` : ''}`;
+  }
+  trackForm.addEventListener('submit', async e => {
     e.preventDefault();
     const v = awb.value.trim();
     result.classList.add('show');
-    if (!v) { result.innerHTML = 'Please enter your <b>AWB / Tracking Number</b>.'; awb.focus(); return; }
-    const safe = v.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
-    result.innerHTML = `Looking up <b>${safe}</b>… For an instant status update call <a href="tel:+919010077370"><b>+91 9010077370</b></a> (Domestic) or <a href="tel:+918886333604"><b>+91 8886333604</b></a> (International).`;
+    if (!v) { result.innerHTML = '<p class="track-note">Please enter your <b>AWB / Tracking Number</b>.</p>'; awb.focus(); return; }
+    const safe = escapeHtml(v);
+    result.innerHTML = `<p class="track-note track-loading"><span class="spinner"></span><span>Checking <b>${safe}</b> with Delhivery, Courier Wala, DHL, FedEx, UPS and Blue Dart…</span></p>`;
+    trackButton.disabled = true;
+    try {
+      const trackUrl = location.protocol === 'file:' ? 'http://127.0.0.1:5510/api/track' : '/api/track';
+      const response = await fetch(trackUrl, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({awb: v})
+      });
+      const data = await response.json();
+      result.innerHTML = renderTrack(data);
+    } catch {
+      result.innerHTML = `<p class="track-note">Tracking could not be reached. ${phoneHelp}</p>`;
+    } finally {
+      trackButton.disabled = false;
+    }
   });
 
   // Service cards pre-select the enquiry form
