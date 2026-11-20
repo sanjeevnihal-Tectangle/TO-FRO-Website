@@ -15,8 +15,8 @@ export default async function handler(request, response) {
   }
 
   const awb = readAwb(request);
-  if (awb.length < 8 || awb.length > 40) {
-    response.status(200).json({ ok: false, code: "invalid", message: "Enter a valid AWB or tracking number." });
+  if (awb.length < 4 || awb.length > 40) {
+    response.status(200).json({ ok: false, code: "invalid", message: "Enter a valid AWB or order ID." });
     return;
   }
 
@@ -82,11 +82,12 @@ async function trackDelhiveryAccount(awb) {
   const config = delhiveryConfig();
   if (!config) return null;
   try {
-    const details = await delhiveryTool(config, "get-shipment-details-by-awb", { awb_number: awb });
+    const details = await delhiveryDetails(config, awb);
     if (!details || !details.awb_number) return { ok: false, code: "not_found" };
+    const waybill = String(details.awb_number).trim();
     let history = {};
     try {
-      history = await delhiveryTool(config, "get-awb-transit-history", { awb_number: awb });
+      history = await delhiveryTool(config, "get-awb-transit-history", { awb_number: waybill });
     } catch {
       history = {};
     }
@@ -108,7 +109,8 @@ async function trackDelhiveryAccount(awb) {
       shipment: {
         carrier: "delhivery",
         carrierName: "Delhivery",
-        awb: String(details.awb_number || awb).trim(),
+        awb: waybill,
+        orderId: orderLabel(details.order_number, waybill),
         status: status || "Status update",
         tone,
         location: scanPlace(details.last_update) || (events[0] && events[0].location) || "",
@@ -120,6 +122,48 @@ async function trackDelhiveryAccount(awb) {
     if (error && error.code === "not_found") return { ok: false, code: "not_found" };
     return null;
   }
+}
+
+async function delhiveryDetails(config, awb) {
+  try {
+    return await delhiveryTool(config, "get-shipment-details-by-awb", { awb_number: awb });
+  } catch (error) {
+    if (!(error && error.code === "not_found") || /^\d+$/.test(awb)) throw error;
+    return findDelhiveryOrder(config, awb);
+  }
+}
+
+async function findDelhiveryOrder(config, orderId) {
+  const stamp = "2020-01-01T00:00:00+05:30";
+  const data = await delhiveryTool(config, "shipment-search", {
+    search_on: ["oid"],
+    search_term: orderId,
+    search_type: "CONTAINS",
+    page: 1,
+    page_size: 5,
+    field: "manifested_at",
+    direction: "DESC",
+    op: "GTE",
+    value: stamp,
+    range_updated_at_op: "GTE",
+    range_updated_at_value: stamp,
+    range_manifested_at_op: "GTE",
+    range_manifested_at_value: stamp,
+    range_estimated_delivery_date_op: "GTE",
+    range_estimated_delivery_date_value: stamp,
+    range_shipped_at_op: "GTE",
+    range_shipped_at_value: stamp,
+    range_dispatch_count_op: "GTE",
+    range_dispatch_count_value: 0,
+  });
+  const rows = Array.isArray(data && data.results) ? data.results : [];
+  const term = orderId.toUpperCase();
+  return rows.find((row) => String((row && row.order_number) || "").toUpperCase() === term) || null;
+}
+
+function orderLabel(orderId, awb) {
+  const text = String(orderId || "").trim();
+  return text && text.toUpperCase() !== String(awb || "").toUpperCase() ? text : "";
 }
 
 async function delhiveryTool(config, name, arguments_) {
@@ -259,6 +303,12 @@ async function trackDelhiveryPublic(awb) {
 }
 
 async function trackCourierWala(awb) {
+  const byAwb = await trackCourierWalaQuery(awb, "A");
+  if (byAwb.ok || byAwb.code !== "not_found") return byAwb;
+  return trackCourierWalaQuery(awb, "R");
+}
+
+async function trackCourierWalaQuery(awb, queryType) {
   let payload;
   try {
     const result = await fetch("https://xpresion.courierwalaexpress.in/api/v1/Tracking/Tracking", {
@@ -268,7 +318,7 @@ async function trackCourierWala(awb) {
         UserID: "CUSTRC",
         Password: "83D54B1C37",
         AWBNo: awb,
-        Type: "A",
+        Type: queryType,
         RequiredUrl: "yes",
         ShowAllFields: "yes",
       }),
@@ -304,6 +354,7 @@ async function trackCourierWala(awb) {
       carrier: "courierwala",
       carrierName: vendor && !/^\d+$/.test(vendor) ? vendor : "Courier Wala",
       awb: String(row.AWBNo || awb).trim(),
+      orderId: orderLabel(row.RefNo || row.OrderNo || row.OrderID, row.AWBNo || awb),
       status,
       tone,
       location: (events[0] && events[0].location) || String(row.Destination || "").trim(),
@@ -343,7 +394,7 @@ function toneOf(status) {
 }
 
 function missing() {
-  return { ok: false, code: "not_found", message: "No shipment was found for this tracking number." };
+  return { ok: false, code: "not_found", message: "No shipment was found for this AWB or order ID." };
 }
 
 function unreachable() {

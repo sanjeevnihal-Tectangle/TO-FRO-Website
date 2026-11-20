@@ -230,7 +230,7 @@ def _shipment(carrier, awb, status, location="", eta="", events=None):
         "tone": _tone(status),
         "location": location or "",
         "eta": _format_time(eta) if eta else "",
-        "events": cleaned[:12],
+        "events": cleaned[:40],
     }
 
 
@@ -714,7 +714,8 @@ def _track_delhivery(awb):
         try:
             return _track_delhivery_one(awb)
         except NotFound:
-            pass
+            if not awb.isdigit():
+                return _track_delhivery_order(awb)
     try:
         return _track_delhivery_public(awb)
     except NotFound:
@@ -756,6 +757,42 @@ def _track_delhivery(awb):
     )
 
 
+def _track_delhivery_order(order_id):
+    """Find a Delhivery shipment by the order number shown in Delhivery One."""
+    stamp = "2020-01-01T00:00:00+05:30"
+    data = _d1_tool("shipment-search", {
+        "search_on": ["oid"],
+        "search_term": order_id,
+        "search_type": "CONTAINS",
+        "page": 1,
+        "page_size": 5,
+        "field": "manifested_at",
+        "direction": "DESC",
+        "op": "GTE",
+        "value": stamp,
+        "range_updated_at_op": "GTE",
+        "range_updated_at_value": stamp,
+        "range_manifested_at_op": "GTE",
+        "range_manifested_at_value": stamp,
+        "range_estimated_delivery_date_op": "GTE",
+        "range_estimated_delivery_date_value": stamp,
+        "range_shipped_at_op": "GTE",
+        "range_shipped_at_value": stamp,
+        "range_dispatch_count_op": "GTE",
+        "range_dispatch_count_value": 0,
+    })
+    rows = data.get("results") if isinstance(data, dict) else None
+    if not isinstance(rows, list):
+        raise NotFound()
+    term = order_id.upper()
+    match = next((row for row in rows if str((row or {}).get("order_number") or "").upper() == term), None)
+    if not isinstance(match, dict) or not match.get("awb_number"):
+        raise NotFound()
+    shipment = _track_delhivery_one(match["awb_number"])
+    shipment["orderId"] = str(match.get("order_number") or order_id)
+    return shipment
+
+
 def _courierwala_auth():
     """Customer tracking login. Env overrides the public Courier Wala track page."""
     user = _env("COURIERWALA_USER_ID") or "CUSTRC"
@@ -793,6 +830,13 @@ def _event_stamp(value):
 
 
 def _track_courierwala(awb):
+    try:
+        return _track_courierwala_query(awb, "A")
+    except NotFound:
+        return _track_courierwala_query(awb, "R")
+
+
+def _track_courierwala_query(awb, query_type):
     user, password = _courierwala_auth()
     url = _env("COURIERWALA_API_URL") or "https://xpresion.courierwalaexpress.in/api/v1/Tracking/Tracking"
     status, payload, _ = _request(
@@ -803,7 +847,7 @@ def _track_courierwala(awb):
             "UserID": user,
             "Password": password,
             "AWBNo": awb,
-            "Type": "A",
+            "Type": query_type,
             "RequiredUrl": "yes",
             "ShowAllFields": "yes",
         }).encode(),
@@ -857,6 +901,9 @@ def _track_courierwala(awb):
     if _tone(current) != "ok":
         eta = _field(row, "ExpectedDeliveryDate", "EDD", "EstimatedDeliveryDate")
     shipment = _shipment("courierwala", _field(row, "AWBNo") or awb, current, location, eta, events)
+    reference = _field(row, "RefNo", "OrderNo", "OrderID")
+    if reference and reference.upper() != str(shipment["awb"]).upper():
+        shipment["orderId"] = reference
     vendor = _field(row, "VendorName", "Vendor", "CourierName", "Carrier", "Forwarder", "ServiceName")
     if vendor and not vendor.replace(" ", "").isdigit():
         shipment["carrierName"] = vendor
@@ -875,11 +922,11 @@ TRACKERS = {
 
 def track_awb(raw):
     awb = normalize_awb(raw)
-    if not 8 <= len(awb) <= 40:
+    if not 4 <= len(awb) <= 40:
         return {
             "ok": False,
             "code": "invalid",
-            "message": "Enter a valid AWB or tracking number.",
+            "message": "Enter a valid AWB or order ID.",
         }
     order = candidates(awb)
     configured = [carrier for carrier in order if _configured(carrier)]
