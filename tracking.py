@@ -66,8 +66,9 @@ def normalize_awb(value):
 def candidates(awb):
     """Return carrier ids from most likely to least likely.
 
-    Courier Wala is always last. It tracks shipments booked with them,
-    including parcels they hand to another carrier.
+    An 8 to 11 digit number is treated as Courier Wala. A 12 to 18 digit
+    number is treated as Delhivery. The other of those two is still tried
+    when the first one has no shipment.
     """
     if re.fullmatch(r"1Z[0-9A-Z]{16}", awb):
         order = ["ups"]
@@ -76,19 +77,18 @@ def candidates(awb):
     else:
         digits = awb.isdigit()
         length = len(awb)
-        if digits and 10 <= length <= 18:
+        if digits and 8 <= length <= 11:
+            order = ["courierwala", "delhivery"]
+        elif digits and 12 <= length <= 18:
             others = []
             if length in {12, 15}:
                 others.append("fedex")
-            if length in {10, 11, 12, 15}:
+            if length in {12}:
                 others.append("bluedart")
-            if length in {10, 11, 12}:
                 others.append("dhl")
             order = ["delhivery", *others]
         elif digits and length in {20, 22, 34}:
             order = ["fedex", "delhivery"]
-        elif digits and length == 9:
-            order = ["ups", "bluedart", "dhl"]
         else:
             order = ["dhl", "fedex", "ups", "bluedart", "delhivery"]
     if "courierwala" not in order:
@@ -658,9 +658,68 @@ def _track_delhivery_one(awb):
     )
 
 
+def _track_delhivery_public(awb):
+    """Public tracking page API. It only answers when the caller is a Delhivery site."""
+    status, payload, _ = _request(
+        "GET",
+        "https://dlv-api.delhivery.com/v3/unified-tracking-new?wbn=" + urllib.parse.quote(awb),
+        {
+            "Accept": "application/json",
+            "Origin": "https://www.delhivery.com",
+            "Referer": "https://www.delhivery.com/",
+            "User-Agent": "Mozilla/5.0",
+        },
+    )
+    if status >= 400:
+        raise Unavailable()
+    data = _json_body(payload)
+    rows = data.get("data") if isinstance(data, dict) else None
+    if not rows:
+        raise NotFound()
+    item = rows[0] if isinstance(rows[0], dict) else {}
+    current = item.get("status") if isinstance(item.get("status"), dict) else {}
+    headline = _pretty_status(current.get("status") or current.get("instructions"))
+    events = []
+    for state in item.get("trackingStates") or []:
+        if not isinstance(state, dict):
+            continue
+        for scan in state.get("scans") or []:
+            if not isinstance(scan, dict):
+                continue
+            description = scan.get("scanNslRemark") or scan.get("scan") or current.get("instructions")
+            if not description:
+                continue
+            events.append({
+                "time": scan.get("scanDateTime") or scan.get("scanDate") or current.get("statusDateTime"),
+                "description": description,
+                "location": scan.get("scannedLocation") or scan.get("cityLocation") or "",
+            })
+    if not events and headline:
+        events.append({
+            "time": current.get("statusDateTime"),
+            "description": current.get("instructions") or headline,
+            "location": "",
+        })
+    location = ""
+    if events:
+        location = events[0]["location"]
+    eta = ""
+    if _tone(headline) != "ok":
+        eta = item.get("promiseDeliveryDate") or item.get("deliveryDateText") or ""
+    return _shipment("delhivery", item.get("awb") or awb, headline, location, eta, events)
+
+
 def _track_delhivery(awb):
     if _d1_config():
-        return _track_delhivery_one(awb)
+        try:
+            return _track_delhivery_one(awb)
+        except NotFound:
+            pass
+    try:
+        return _track_delhivery_public(awb)
+    except NotFound:
+        if not _env("DELHIVERY_API_TOKEN"):
+            raise
     host = "staging-express.delhivery.com" if _flag("DELHIVERY_SANDBOX") else "track.delhivery.com"
     status, payload, _ = _request(
         "GET",

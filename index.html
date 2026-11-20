@@ -706,16 +706,93 @@
     }
     return '';
   }
+  function detectCarrier(value){
+    const awb = String(value || '').replace(/[^A-Za-z0-9]/g, '');
+    if (/^\d{12,18}$/.test(awb)) return 'delhivery';
+    if (/^\d{8,11}$/.test(awb)) return 'courierwala';
+    return '';
+  }
+  function prettyStatus(value){
+    const text = String(value || '').trim();
+    if (text && text === text.toUpperCase()) {
+      return text.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase());
+    }
+    return text;
+  }
+  function formatStamp(value){
+    const text = String(value || '').trim();
+    const match = text.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+    return match ? `${match[3]}-${match[2]}-${match[1]} ${match[4]}:${match[5]}` : text;
+  }
+  async function trackDelhivery(awbNumber){
+    try {
+      const site = await trackOnSite(awbNumber);
+      if (site && (site.ok || site.code === 'not_found')) return site;
+    } catch { /* the live page has no tracking server */ }
+    try {
+      const response = await fetch('https://dlv-api.delhivery.com/v3/unified-tracking-new?wbn=' + encodeURIComponent(awbNumber), {
+        headers: {Accept: 'application/json'}
+      });
+      const payload = await response.json();
+      const item = payload && payload.data && payload.data[0];
+      if (!item) {
+        return {ok: false, code: 'not_found', message: 'No shipment was found for this tracking number.'};
+      }
+      const current = item.status || {};
+      const headline = prettyStatus(current.status || current.instructions || '');
+      const events = [];
+      (item.trackingStates || []).forEach(state => {
+        ((state && state.scans) || []).forEach(scan => {
+          const description = String(scan.scanNslRemark || scan.scan || current.instructions || '').trim();
+          if (!description) return;
+          events.push({
+            time: formatStamp(scan.scanDateTime || scan.scanDate || current.statusDateTime || ''),
+            description,
+            location: String(scan.scannedLocation || scan.cityLocation || '').trim()
+          });
+        });
+      });
+      if (!events.length && headline) {
+        events.push({
+          time: formatStamp(current.statusDateTime || ''),
+          description: String(current.instructions || headline).trim(),
+          location: ''
+        });
+      }
+      const tone = toneOf(headline);
+      return {
+        ok: true,
+        shipment: {
+          carrier: 'delhivery',
+          carrierName: 'Delhivery',
+          awb: String(item.awb || awbNumber).trim(),
+          status: headline || 'Status update',
+          tone,
+          location: (events[0] && events[0].location) || '',
+          eta: tone === 'ok' ? '' : formatStamp(item.promiseDeliveryDate || item.deliveryDateText || ''),
+          events: events.slice(0, 12)
+        }
+      };
+    } catch {
+      return {ok: false, code: 'unavailable', message: 'Delhivery tracking could not be reached. Please try again in a moment.'};
+    }
+  }
   async function trackOnSite(awbNumber){
-    const trackUrl = location.protocol === 'file:' ? 'http://127.0.0.1:5510/api/track' : '/api/track';
-    const response = await fetch(trackUrl, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({awb: awbNumber})
-    });
-    const data = await response.json();
-    if (!data || typeof data.ok !== 'boolean') throw new Error('no tracking api');
-    return data;
+    const urls = location.protocol === 'file:'
+      ? ['http://127.0.0.1:5510/api/track']
+      : ['/api/track', '/api/track.php'];
+    for (const trackUrl of urls) {
+      try {
+        const response = await fetch(trackUrl, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({awb: awbNumber})
+        });
+        const data = await response.json();
+        if (data && typeof data.ok === 'boolean') return data;
+      } catch { /* try the next tracking endpoint */ }
+    }
+    throw new Error('no tracking api');
   }
   async function trackCourierWala(awbNumber){
     const response = await fetch('https://xpresion.courierwalaexpress.in/api/v1/Tracking/Tracking', {
@@ -772,12 +849,23 @@
     result.classList.add('show');
     if (!v) { result.innerHTML = '<p class="track-note">Please enter your <b>AWB / Tracking Number</b>.</p>'; awb.focus(); return; }
     const safe = escapeHtml(v);
-    result.innerHTML = `<p class="track-note track-loading"><span class="spinner"></span><span>Checking <b>${safe}</b> with Delhivery, Courier Wala, DHL, FedEx, UPS and Blue Dart…</span></p>`;
+    const kind = detectCarrier(v);
+    const label = kind === 'delhivery' ? 'Delhivery' : kind === 'courierwala' ? 'Courier Wala' : 'Delhivery and Courier Wala';
+    result.innerHTML = `<p class="track-note track-loading"><span class="spinner"></span><span>Checking <b>${safe}</b> with ${label}…</span></p>`;
     trackButton.disabled = true;
     try {
+      const order = kind === 'delhivery' ? ['delhivery', 'courierwala'] : ['courierwala', 'delhivery'];
       let data = null;
-      try { data = await trackOnSite(v); } catch { data = null; }
-      if (!data) data = await trackCourierWala(v);
+      let unreachable = false;
+      for (const carrier of order) {
+        const found = carrier === 'delhivery' ? await trackDelhivery(v) : await trackCourierWala(v);
+        if (found && found.ok) { data = found; break; }
+        if (found && found.code === 'not_found') data = found;
+        else if (!data && found && found.code === 'unavailable') unreachable = true;
+      }
+      if (!data) {
+        data = {ok: false, code: 'unavailable', message: unreachable ? 'The courier tracking service could not be reached. Please try again in a moment.' : 'No shipment was found for this tracking number.'};
+      }
       result.innerHTML = renderTrack(data);
     } catch {
       result.innerHTML = `<p class="track-note">Tracking could not be reached. ${phoneHelp}</p>`;
