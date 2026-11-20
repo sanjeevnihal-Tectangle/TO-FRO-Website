@@ -683,6 +683,89 @@
       ${facts ? `<div class="track-facts">${facts}</div>` : ''}
       ${events ? `<div class="track-journey"><h3>Shipment history</h3><ol class="track-events">${events}</ol></div>` : ''}`;
   }
+  function toneOf(status){
+    const text = String(status || '').toLowerCase();
+    if (/deliver|signed/.test(text)) return 'ok';
+    if (/fail|exception|undeliver|return|cancel|refused/.test(text)) return 'bad';
+    if (/transit|out for|pickup|picked|depart|arriv|customs|manifest/.test(text)) return 'move';
+    return 'wait';
+  }
+  function clockText(value){
+    const text = String(value || '').trim();
+    const digits = text.match(/^(\d{2})(\d{2})(?:\d{2})?$/);
+    return digits ? `${digits[1]}:${digits[2]}` : text;
+  }
+  function dateText(value){
+    const match = String(value || '').trim().match(/^(\d{2})[/-](\d{2})[/-](\d{4})/);
+    return match ? `${match[1]}-${match[2]}-${match[3]}` : String(value || '').trim();
+  }
+  function field(row, names){
+    for (const name of names) {
+      const text = String((row && row[name]) || '').trim();
+      if (text && !/^(null|none|n\/a|na|-)$/i.test(text)) return text;
+    }
+    return '';
+  }
+  async function trackOnSite(awbNumber){
+    const trackUrl = location.protocol === 'file:' ? 'http://127.0.0.1:5510/api/track' : '/api/track';
+    const response = await fetch(trackUrl, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({awb: awbNumber})
+    });
+    const data = await response.json();
+    if (!data || typeof data.ok !== 'boolean') throw new Error('no tracking api');
+    return data;
+  }
+  async function trackCourierWala(awbNumber){
+    const response = await fetch('https://xpresion.courierwalaexpress.in/api/v1/Tracking/Tracking', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        UserID: 'CUSTRC',
+        Password: '83D54B1C37',
+        AWBNo: awbNumber,
+        Type: 'A',
+        RequiredUrl: 'yes',
+        ShowAllFields: 'yes'
+      })
+    });
+    const data = await response.json();
+    const payload = data && data.Response || {};
+    const disc = String(payload.ErrorDisc || '');
+    const rows = Array.isArray(payload.Tracking) ? payload.Tracking : (payload.Tracking ? [payload.Tracking] : []);
+    if (!/success/i.test(disc) || !rows.length) {
+      if (/not exist|not found|no record|no data/i.test(disc)) {
+        return {ok: false, code: 'not_found', message: 'No shipment was found for this tracking number.'};
+      }
+      return {ok: false, code: 'unavailable', message: 'The courier tracking service could not be reached. Please try again in a moment.'};
+    }
+    const row = rows[0];
+    const events = (Array.isArray(payload.Events) ? payload.Events : []).map(item => {
+      const description = field(item, ['Status', 'Remark']);
+      if (!description) return null;
+      return {
+        time: [dateText(field(item, ['EventDate'])), clockText(field(item, ['EventTime']))].filter(Boolean).join(' '),
+        description,
+        location: field(item, ['Location', 'City'])
+      };
+    }).filter(Boolean);
+    const status = field(row, ['Status']) || (events[0] && events[0].description) || 'Status update';
+    const vendor = field(row, ['VendorName', 'Vendor', 'CourierName']);
+    return {
+      ok: true,
+      shipment: {
+        carrier: 'courierwala',
+        carrierName: vendor && !/^\d+$/.test(vendor) ? vendor : 'Courier Wala',
+        awb: field(row, ['AWBNo']) || awbNumber,
+        status,
+        tone: toneOf(status),
+        location: (events[0] && events[0].location) || field(row, ['Destination']),
+        eta: toneOf(status) === 'ok' ? '' : dateText(field(row, ['ExpectedDeliveryDate'])),
+        events
+      }
+    };
+  }
   trackForm.addEventListener('submit', async e => {
     e.preventDefault();
     const v = awb.value.trim();
@@ -692,13 +775,9 @@
     result.innerHTML = `<p class="track-note track-loading"><span class="spinner"></span><span>Checking <b>${safe}</b> with Delhivery, Courier Wala, DHL, FedEx, UPS and Blue Dart…</span></p>`;
     trackButton.disabled = true;
     try {
-      const trackUrl = location.protocol === 'file:' ? 'http://127.0.0.1:5510/api/track' : '/api/track';
-      const response = await fetch(trackUrl, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({awb: v})
-      });
-      const data = await response.json();
+      let data = null;
+      try { data = await trackOnSite(v); } catch { data = null; }
+      if (!data) data = await trackCourierWala(v);
       result.innerHTML = renderTrack(data);
     } catch {
       result.innerHTML = `<p class="track-note">Tracking could not be reached. ${phoneHelp}</p>`;

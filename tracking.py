@@ -715,6 +715,14 @@ def _field(row, *names):
     return ""
 
 
+def _clock(value):
+    text = str(value or "").strip()
+    match = re.fullmatch(r"(\d{2})(\d{2})(\d{2})?", text)
+    if match:
+        return f"{match.group(1)}:{match.group(2)}"
+    return text
+
+
 def _event_stamp(value):
     text = str(value or "").strip()
     for fmt in ("%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d-%m-%Y %H:%M:%S", "%d-%m-%Y %H:%M", "%d/%m/%Y", "%d-%m-%Y"):
@@ -769,7 +777,7 @@ def _track_courierwala(awb):
     for item in raw_events:
         if not isinstance(item, dict):
             continue
-        when = " ".join(part for part in (_field(item, "EventDate"), _field(item, "EventTime")) if part)
+        when = " ".join(part for part in (_field(item, "EventDate"), _clock(_field(item, "EventTime"))) if part)
         label = _pretty_status(_field(item, "Status", "Remark", "Activity"))
         if not label:
             continue
