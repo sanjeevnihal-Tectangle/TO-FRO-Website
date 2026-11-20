@@ -781,6 +781,9 @@
     const urls = location.protocol === 'file:'
       ? ['http://127.0.0.1:5510/api/track']
       : ['/api/track', '/api/track.php'];
+    if (location.protocol !== 'file:' && location.host !== 'www.tnfexpress.krackbot.com') {
+      urls.push('https://www.tnfexpress.krackbot.com/api/track');
+    }
     for (const trackUrl of urls) {
       try {
         const response = await fetch(trackUrl, {
@@ -856,15 +859,17 @@
     try {
       const order = kind === 'delhivery' ? ['delhivery', 'courierwala'] : ['courierwala', 'delhivery'];
       let data = null;
-      let unreachable = false;
+      let blocked = false;
       for (const carrier of order) {
         const found = carrier === 'delhivery' ? await trackDelhivery(v) : await trackCourierWala(v);
         if (found && found.ok) { data = found; break; }
-        if (found && found.code === 'not_found') data = found;
-        else if (!data && found && found.code === 'unavailable') unreachable = true;
+        if (found && found.code === 'unavailable' && !data) blocked = true;
+        else if (found && found.code === 'not_found' && !blocked) data = found;
       }
       if (!data) {
-        data = {ok: false, code: 'unavailable', message: unreachable ? 'The courier tracking service could not be reached. Please try again in a moment.' : 'No shipment was found for this tracking number.'};
+        data = blocked
+          ? {ok: false, code: 'unavailable', message: 'The courier tracking service could not be reached. Please try again in a moment.'}
+          : {ok: false, code: 'not_found', message: 'No shipment was found for this tracking number.'};
       }
       result.innerHTML = renderTrack(data);
     } catch {
