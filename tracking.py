@@ -22,6 +22,7 @@ from email.utils import parsedate_to_datetime
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
 CARRIERS = (
+    {"id": "shipway", "name": "Shipway"},
     {"id": "dhl", "name": "DHL"},
     {"id": "fedex", "name": "FedEx"},
     {"id": "ups", "name": "UPS"},
@@ -1018,6 +1019,120 @@ def _track_courierwala_query(awb, query_type):
     return shipment
 
 
+SHIPWAY_URL = "https://shipway.in/api/getOrderShipmentDetails"
+
+# Shipway status codes (see Shipway Experience > Settings > Webhooks).
+SHIPWAY_TONES = {
+    "DEL": "ok",
+    "UND": "bad", "RTO": "bad", "RTD": "bad", "CAN": "bad", "LOST": "bad", "DMG": "bad",
+    "INT": "move", "OOD": "move", "SHP": "move", "PKP": "move", "OFP": "move", "RAD": "move",
+}
+
+
+def _shipway_auth():
+    return _env("SHIPWAY_USERNAME"), _env("SHIPWAY_LICENCE_KEY")
+
+
+def _shipway_configured():
+    user, key = _shipway_auth()
+    return bool(user and key)
+
+
+def _shipway_events(response):
+    """Scan history, if Shipway includes it. The documented sample has none, so key names vary."""
+    for name in ("scan", "scans", "scan_details", "shipment_track_activities", "tracking_history", "history"):
+        rows = response.get(name)
+        if isinstance(rows, dict):
+            rows = list(rows.values())
+        if isinstance(rows, list) and rows:
+            break
+    else:
+        return []
+    events = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        events.append({
+            "time": _field(row, "time", "datetime", "date", "scan_time", "updated_at"),
+            "description": _pretty_status(_field(row, "status_detail", "status", "activity", "remark", "remarks", "scan", "message")),
+            "location": _field(row, "location", "city", "scan_location", "place"),
+        })
+    return events
+
+
+def _track_shipway(value, field="order_id"):
+    """Look up a shipment in Shipway Experience by order ID (field "order_id") or AWB ("awbno")."""
+    user, key = _shipway_auth()
+    status, payload, _ = _request(
+        "POST",
+        SHIPWAY_URL,
+        {"Content-Type": "application/json", "Accept": "application/json"},
+        json.dumps({"username": user, "password": key, field: value}).encode(),
+    )
+    if status >= 500:
+        raise Unavailable()
+    data = _json_body(payload)
+    if not isinstance(data, dict):
+        raise Unavailable()
+    if str(data.get("status") or "").lower() != "success":
+        message = str(data.get("msg") or data.get("message") or "").lower()
+        if "password" in message or "email" in message or "licen" in message or status == 401:
+            raise Unavailable()
+        raise NotFound()
+    response = data.get("response")
+    if isinstance(response, list):
+        response = response[0] if response else None
+    if not isinstance(response, dict):
+        raise NotFound()
+    awb = _field(response, "awbno", "awb", "tracking_number")
+    code = _field(response, "current_status_code").upper()
+    current = _field(response, "current_status") or "Status update"
+    if not awb and code in {"", "NFI"} and current.lower() in {"status update", "no information yet"}:
+        raise NotFound()
+    events = _shipway_events(response)
+    stamp = _field(response, "time", "pickup_date")
+    if not events and current and stamp:
+        events = [{"time": stamp, "description": current, "location": _field(response, "to", "from")}]
+    events.sort(key=lambda item: _event_stamp(_format_time(item["time"])) or datetime.min, reverse=True)
+    extra = response.get("extra_fields") if isinstance(response.get("extra_fields"), dict) else {}
+    order_id = _field(response, "order_id") or (value if field == "order_id" else "")
+    tone = SHIPWAY_TONES.get(code) or _tone(current)
+    shipment = _shipment(
+        "shipway",
+        awb or value,
+        current,
+        _field(response, "current_location", "location") or (events[0]["location"] if events else ""),
+        "" if tone == "ok" else _field(extra, "expected_delivery_date") or _field(response, "expected_delivery_date", "edd", "etd"),
+        events,
+    )
+    shipment["tone"] = tone
+    carrier = _field(response, "carrier", "courier_name", "courier")
+    if carrier:
+        shipment["carrierName"] = "FedEx" if carrier.lower() == "fedex" else carrier
+    if order_id and order_id.upper() != str(shipment["awb"]).upper():
+        shipment["orderId"] = order_id
+    return shipment
+
+
+def _shipway_lookup(raw):
+    """Try the input as an order ID, then as an AWB, both as typed and cleaned.
+
+    Shipway order IDs may contain '-' or '_', so the typed form is tried first.
+    """
+    typed = str(raw or "").strip().lstrip("#").strip()
+    values = []
+    for value in (typed, normalize_awb(raw)):
+        if value and value not in values and len(value) <= 60:
+            values.append(value)
+    for field in ("order_id", "awbno"):
+        for value in values:
+            try:
+                return _track_shipway(value, field)
+            except NotFound:
+                continue
+    raise NotFound()
+
+
 TRACKERS = {
     "dhl": _track_dhl,
     "fedex": _track_fedex,
@@ -1036,6 +1151,17 @@ def track_awb(raw):
             "code": "invalid",
             "message": "Enter a valid AWB or order ID.",
         }
+    shipway_failed = False
+    if _shipway_configured():
+        # Shipway is one quick call against the account's own orders, so it is asked first.
+        try:
+            shipment = _shipway_lookup(raw)
+            shipment["checked"] = ["Shipway"]
+            return {"ok": True, "shipment": shipment}
+        except NotFound:
+            pass
+        except (Unavailable, LookupError, TimeoutError):
+            shipway_failed = True
     order = candidates(awb)
     configured = [carrier for carrier in order if _configured(carrier)]
     if not configured:
@@ -1058,7 +1184,7 @@ def track_awb(raw):
             continue
         except (Unavailable, LookupError, TimeoutError):
             failures.append(CARRIER_NAMES[carrier])
-    if failures and len(failures) == len(configured):
+    if failures and len(failures) == len(configured) and (shipway_failed or not _shipway_configured()):
         return {
             "ok": False,
             "code": "unavailable",

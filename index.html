@@ -639,7 +639,12 @@
   function splitScan(event){
     const description = String(event.description || '');
     const at = description.lastIndexOf(' at ');
-    if (at > 0) return {title: lead(description.slice(0, at)), place: placeName(description.slice(at + 4))};
+    // Delhivery scans read "Status at Place"; only split when that place is the scan's location,
+    // so text like FedEx's "Arrived at FedEx hub" stays whole.
+    const after = at > 0 ? placeName(description.slice(at + 4)) : '';
+    if (at > 0 && (!event.location || after === placeName(event.location))) {
+      return {title: lead(description.slice(0, at)), place: after};
+    }
     const place = event.location && !description.includes(event.location) ? placeName(event.location) : '';
     return {title: lead(description), place};
   }

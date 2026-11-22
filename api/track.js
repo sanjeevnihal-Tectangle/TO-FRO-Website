@@ -20,6 +20,13 @@ export default async function handler(request, response) {
     return;
   }
 
+  // Shipway is one quick call against the account's own orders, so it is asked first.
+  const shipway = await trackShipway(readTyped(request), awb);
+  if (shipway && shipway.ok) {
+    response.status(200).json(shipway);
+    return;
+  }
+
   const delhivery = await trackDelhivery(awb);
   if (delhivery.ok) {
     response.status(200).json(delhivery);
@@ -38,7 +45,7 @@ export default async function handler(request, response) {
   response.status(200).json(courier.ok ? courier : unreachable());
 }
 
-function readAwb(request) {
+function readInput(request) {
   const query = request.query && request.query.awb;
   let body = request.body;
   if (typeof body === "string") {
@@ -48,8 +55,130 @@ function readAwb(request) {
       body = {};
     }
   }
-  const source = (body && body.awb) || query || "";
-  return String(source).replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  return String((body && body.awb) || query || "");
+}
+
+function readAwb(request) {
+  return readInput(request).replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+}
+
+// The order ID as typed, minus a leading "#": Shipway order IDs may contain "-" or "_".
+function readTyped(request) {
+  return readInput(request).trim().replace(/^#+/, "").trim().slice(0, 60);
+}
+
+// ---------- Shipway (orders pushed into Shipway Experience; tracked by order ID only) ----------
+
+const SHIPWAY_URL = "https://shipway.in/api/getOrderShipmentDetails";
+const SHIPWAY_TONES = {
+  DEL: "ok",
+  UND: "bad", RTO: "bad", RTD: "bad", CAN: "bad", LOST: "bad", DMG: "bad",
+  INT: "move", OOD: "move", SHP: "move", PKP: "move", OFP: "move", RAD: "move",
+};
+
+function shipwayAuth() {
+  const username = String(process.env.SHIPWAY_USERNAME || "").trim();
+  const password = String(process.env.SHIPWAY_LICENCE_KEY || "").trim();
+  return username && password ? { username, password } : null;
+}
+
+function pick(row, names) {
+  for (const name of names) {
+    const text = String((row && row[name]) ?? "").trim();
+    if (text && !/^(null|none|n\/a|na|-)$/i.test(text)) return text;
+  }
+  return "";
+}
+
+// Scan history, if Shipway includes it. The documented sample has none, so key names vary.
+function shipwayEvents(details) {
+  for (const name of ["scan", "scans", "scan_details", "shipment_track_activities", "tracking_history", "history"]) {
+    let rows = details[name];
+    if (rows && typeof rows === "object" && !Array.isArray(rows)) rows = Object.values(rows);
+    if (Array.isArray(rows) && rows.length) {
+      return rows.filter((row) => row && typeof row === "object").map((row) => ({
+        time: formatTime(pick(row, ["time", "datetime", "date", "scan_time", "updated_at"])),
+        description: prettyStatus(pick(row, ["status_detail", "status", "activity", "remark", "remarks", "scan", "message"])),
+        location: pick(row, ["location", "city", "scan_location", "place"]),
+      })).filter((event) => event.description).sort((left, right) => sortKey(right.time).localeCompare(sortKey(left.time)));
+    }
+  }
+  return [];
+}
+
+// "dd-mm-yyyy HH:MM" -> "yyyy-mm-dd HH:MM" so events sort newest first.
+function sortKey(time) {
+  const match = String(time || "").match(/^(\d{2})-(\d{2})-(\d{4})(.*)$/);
+  return match ? `${match[3]}-${match[2]}-${match[1]}${match[4]}` : String(time || "");
+}
+
+// Looks up a Shipway shipment by order ID (field "order_id") or AWB (field "awbno").
+async function shipwayOrder(auth, value, field) {
+  const result = await fetch(SHIPWAY_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ username: auth.username, password: auth.password, [field]: value }),
+  });
+  if (result.status >= 500) return { ok: false, code: "unavailable" };
+  const data = await result.json().catch(() => null);
+  if (!data || typeof data !== "object") return { ok: false, code: "unavailable" };
+  if (String(data.status || "").toLowerCase() !== "success") {
+    const message = String(data.msg || data.message || "").toLowerCase();
+    if (result.status === 401 || /password|email|licen/.test(message)) return { ok: false, code: "unavailable" };
+    return { ok: false, code: "not_found" };
+  }
+  const details = Array.isArray(data.response) ? data.response[0] : data.response;
+  if (!details || typeof details !== "object") return { ok: false, code: "not_found" };
+  const waybill = pick(details, ["awbno", "awb", "tracking_number"]);
+  const code = pick(details, ["current_status_code"]).toUpperCase();
+  const status = pick(details, ["current_status"]) || "Status update";
+  if (!waybill && (!code || code === "NFI") && /^(status update|no information yet)$/i.test(status)) {
+    return { ok: false, code: "not_found" };
+  }
+  let events = shipwayEvents(details);
+  const stamp = pick(details, ["time", "pickup_date"]);
+  if (!events.length && stamp) {
+    events = [{ time: formatTime(stamp), description: status, location: pick(details, ["to", "from"]) }];
+  }
+  const tone = SHIPWAY_TONES[code] || toneOf(status);
+  const extra = details.extra_fields && typeof details.extra_fields === "object" ? details.extra_fields : {};
+  const orderId = pick(details, ["order_id"]) || (field === "order_id" ? value : "");
+  const carrier = pick(details, ["carrier", "courier_name", "courier"]);
+  return {
+    ok: true,
+    shipment: {
+      carrier: "shipway",
+      carrierName: /^fedex$/i.test(carrier) ? "FedEx" : carrier || "Shipway",
+      awb: waybill || value,
+      orderId: orderLabel(orderId, waybill || value),
+      status,
+      tone,
+      location: pick(details, ["current_location", "location"]) || (events[0] && events[0].location) || "",
+      eta: tone === "ok" ? "" : formatTime(pick(extra, ["expected_delivery_date"]) || pick(details, ["expected_delivery_date", "edd", "etd"])),
+      events: events.slice(0, 40),
+    },
+  };
+}
+
+async function trackShipway(typed, cleaned) {
+  const auth = shipwayAuth();
+  if (!auth) return null;
+  const tried = new Set();
+  let reached = false;
+  const values = [typed, cleaned].filter((value) => value && !tried.has(value) && tried.add(value));
+  // Try the input as an order ID first, then as an AWB.
+  for (const field of ["order_id", "awbno"]) {
+    for (const value of values) {
+      try {
+        const found = await shipwayOrder(auth, value, field);
+        if (found.ok) return found;
+        if (found.code === "not_found") reached = true;
+      } catch {
+        /* Shipway unreachable: fall through to the other carriers */
+      }
+    }
+  }
+  return { ok: false, code: reached ? "not_found" : "unavailable" };
 }
 
 let delhiveryToken = { value: "", expires: 0 };
