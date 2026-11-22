@@ -859,11 +859,9 @@
     const v = awb.value.trim();
     result.classList.add('show');
     if (!v) { result.innerHTML = '<p class="track-note">Please enter an <b>AWB</b> or <b>order ID</b>.</p>'; awb.focus(); return; }
-    const safe = escapeHtml(v);
     const kind = detectCarrier(v);
     const orderLike = /[A-Za-z]/.test(v.replace(/[^A-Za-z0-9]/g, ''));
-    const label = kind === 'delhivery' ? 'Delhivery' : kind === 'courierwala' ? 'Courier Wala' : 'Delhivery and Courier Wala';
-    result.innerHTML = `<p class="track-note track-loading"><span class="spinner"></span><span>Checking <b>${safe}</b> with ${label}…</span></p>`;
+    result.innerHTML = '<p class="track-note track-loading"><span class="spinner"></span><span>Checking…</span></p>';
     trackButton.disabled = true;
     try {
       const order = kind === 'courierwala' && !orderLike ? ['courierwala', 'delhivery'] : (kind === 'delhivery' || orderLike) ? ['delhivery', 'courierwala'] : ['courierwala', 'delhivery'];
