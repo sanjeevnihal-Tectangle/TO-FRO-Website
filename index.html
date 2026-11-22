@@ -99,8 +99,9 @@
   .track-result{display:none;width:min(1245px,100%);margin:16px auto 0;border-radius:16px;background:#fff;box-shadow:var(--shadow);font-size:15px;color:var(--text);overflow:hidden}
   .track-result.show{display:block}
   .track-result b{color:var(--navy)}
-  .track-note{display:flex;align-items:flex-start;gap:12px;padding:18px 22px;line-height:1.5;border-left:4px solid var(--orange)}
-  .track-note a{color:var(--navy)}
+  .track-note{display:block;padding:18px 22px;line-height:1.6;border-left:4px solid var(--orange)}
+  .track-note.track-loading{display:flex;align-items:center;gap:12px}
+  .track-note a{color:var(--navy);white-space:nowrap}
   .track-loading{align-items:center;color:var(--muted)}
   .spinner{width:18px;height:18px;flex:none;border-radius:50%;border:2px solid var(--peach);border-top-color:var(--orange);animation:spin .7s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}

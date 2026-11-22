@@ -128,19 +128,109 @@ async function delhiveryDetails(config, awb) {
   try {
     return await delhiveryTool(config, "get-shipment-details-by-awb", { awb_number: awb });
   } catch (error) {
-    if (!(error && error.code === "not_found") || /^\d+$/.test(awb)) throw error;
-    return findDelhiveryOrder(config, awb);
+    if (!(error && error.code === "not_found")) throw error;
+    // Order IDs are often all digits (e.g. 88806958), so any unmatched number is also searched as an order ID.
+    const match = await findDelhiveryOrder(config, awb);
+    const waybill = (match && match.awb_number) || (await findUnshippedOrder(config, awb));
+    if (!waybill) return null;
+    return delhiveryTool(config, "get-shipment-details-by-awb", { awb_number: String(waybill) });
   }
 }
 
 async function findDelhiveryOrder(config, orderId) {
+  const rows = await searchShipments(config, orderId, 5);
+  const term = orderId.toUpperCase();
+  return rows.find((row) => String((row && row.order_number) || "").toUpperCase() === term) || null;
+}
+
+// Order number -> AWB pairs seen while scanning (kept while this server instance is warm).
+// Delhivery's firewall blocks bursts of requests (403), so scans are small, run one at a
+// time, and never re-read an AWB whose order is already known.
+const orderAwbs = new Map();
+const knownSerials = new Set();
+const missedOrders = new Map();
+let scanQueue = Promise.resolve();
+const SCAN_WORKERS = 4;
+const SCAN_BACK = 30;
+const SCAN_AHEAD_MAX = 80;
+const SCAN_GAP = 6;
+const MISS_TTL_MS = 10 * 60 * 1000;
+
+// Delhivery AWBs end in a check digit: (serial - 1) mod 7.
+function awbFromSerial(serial) {
+  return `${serial}${(serial - 1) % 7}`;
+}
+
+async function orderOfAwb(config, awb) {
+  try {
+    const details = await delhiveryTool(config, "get-shipment-details-by-awb", { awb_number: awb });
+    if (!details || !details.awb_number) return "";
+    const orderNumber = String(details.order_number || "").trim().toUpperCase();
+    if (orderNumber) {
+      orderAwbs.set(orderNumber, String(details.awb_number));
+      knownSerials.add(Math.floor(Number(awb) / 10));
+    }
+    return orderNumber;
+  } catch (error) {
+    if (error && error.code === "not_found") return "";
+    throw error;
+  }
+}
+
+// Reads the AWBs for these serials. Returns { matched, hits } where hits marks used AWBs.
+async function scanSerials(config, serials, term) {
+  const todo = serials.filter((serial) => !knownSerials.has(serial));
+  const found = await Promise.all(todo.map((serial) => orderOfAwb(config, awbFromSerial(serial))));
+  if (found.includes(term)) return { matched: true, hits: [] };
+  const hitBySerial = new Map(todo.map((serial, index) => [serial, Boolean(found[index])]));
+  return { matched: false, hits: serials.map((serial) => (hitBySerial.has(serial) ? hitBySerial.get(serial) : true)) };
+}
+
+// Delhivery's search only lists parcels that have been picked up. This account's AWBs are
+// issued in sequence, so AWBs near the newest shipped one are read directly and matched on order number.
+function findUnshippedOrder(config, orderId) {
+  const run = scanQueue.then(() => scanForOrder(config, orderId));
+  scanQueue = run.catch(() => {});
+  return run;
+}
+
+async function scanForOrder(config, orderId) {
+  const term = orderId.toUpperCase();
+  if (orderAwbs.has(term)) return orderAwbs.get(term);
+  if (Date.now() - (missedOrders.get(term) || 0) < MISS_TTL_MS) return "";
+  const latest = await searchShipments(config, "", 20);
+  const serials = latest
+    .map((row) => String((row && row.awb_number) || ""))
+    .filter((awb) => /^\d{10,}$/.test(awb))
+    .map((awb) => Math.floor(Number(awb) / 10));
+  if (!serials.length) return "";
+  const anchor = Math.max(...serials);
+  let ahead = 1;
+  let misses = 0;
+  while (ahead <= SCAN_AHEAD_MAX && misses < SCAN_GAP) {
+    const batch = Array.from({ length: SCAN_WORKERS }, (_, index) => anchor + ahead + index);
+    const { matched, hits } = await scanSerials(config, batch, term);
+    if (matched) return orderAwbs.get(term);
+    for (const hit of hits) misses = hit ? 0 : misses + 1;
+    ahead += SCAN_WORKERS;
+  }
+  for (let start = 0; start < SCAN_BACK; start += SCAN_WORKERS) {
+    const batch = Array.from({ length: SCAN_WORKERS }, (_, index) => anchor - start - index);
+    const { matched } = await scanSerials(config, batch, term);
+    if (matched) return orderAwbs.get(term);
+  }
+  missedOrders.set(term, Date.now());
+  return "";
+}
+
+async function searchShipments(config, term, pageSize) {
   const stamp = "2020-01-01T00:00:00+05:30";
   const data = await delhiveryTool(config, "shipment-search", {
     search_on: ["oid"],
-    search_term: orderId,
+    search_term: term,
     search_type: "CONTAINS",
     page: 1,
-    page_size: 5,
+    page_size: pageSize,
     field: "manifested_at",
     direction: "DESC",
     op: "GTE",
@@ -156,9 +246,7 @@ async function findDelhiveryOrder(config, orderId) {
     range_dispatch_count_op: "GTE",
     range_dispatch_count_value: 0,
   });
-  const rows = Array.isArray(data && data.results) ? data.results : [];
-  const term = orderId.toUpperCase();
-  return rows.find((row) => String((row && row.order_number) || "").toUpperCase() === term) || null;
+  return Array.isArray(data && data.results) ? data.results.filter((row) => row && typeof row === "object") : [];
 }
 
 function orderLabel(orderId, awb) {

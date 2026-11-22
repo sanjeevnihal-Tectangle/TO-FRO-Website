@@ -4,8 +4,9 @@
     {
       "name": "site",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["D:/Website Projects/To&Fro/.claude/serve.py", "5510"],
-      "port": 5510
+      "runtimeArgs": ["D:/Website Projects/To&Fro/serve.py", "5510"],
+      "port": 5510,
+      "autoPort": false
     }
   ]
 }

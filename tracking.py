@@ -648,7 +648,7 @@ def _track_delhivery_one(awb):
     events.sort(key=lambda item: str(item.get("time") or ""), reverse=True)
     status = _pretty_status(details.get("unmapped_shipment_status") or details.get("shipment_status"))
     location = _scan_place(details.get("last_update")) or details.get("destination") or ""
-    return _shipment(
+    shipment = _shipment(
         "delhivery",
         details.get("awb_number") or awb,
         status,
@@ -656,6 +656,10 @@ def _track_delhivery_one(awb):
         _epoch_text(details.get("estimated_delivery_date") or details.get("promised_delivery_date")),
         events,
     )
+    order_number = str(details.get("order_number") or "").strip()
+    if order_number and order_number.upper() != str(shipment["awb"]).upper():
+        shipment["orderId"] = order_number
+    return shipment
 
 
 def _track_delhivery_public(awb):
@@ -714,8 +718,13 @@ def _track_delhivery(awb):
         try:
             return _track_delhivery_one(awb)
         except NotFound:
-            if not awb.isdigit():
-                return _track_delhivery_order(awb)
+            pass
+        # Delhivery One order IDs are often all digits (e.g. 88806958), so an
+        # unmatched number is always searched as an order ID too.
+        try:
+            return _track_delhivery_order(awb)
+        except NotFound:
+            pass
     try:
         return _track_delhivery_public(awb)
     except NotFound:
@@ -757,15 +766,14 @@ def _track_delhivery(awb):
     )
 
 
-def _track_delhivery_order(order_id):
-    """Find a Delhivery shipment by the order number shown in Delhivery One."""
+def _d1_search(term, page_size=5):
     stamp = "2020-01-01T00:00:00+05:30"
-    data = _d1_tool("shipment-search", {
+    return _d1_tool("shipment-search", {
         "search_on": ["oid"],
-        "search_term": order_id,
+        "search_term": term,
         "search_type": "CONTAINS",
         "page": 1,
-        "page_size": 5,
+        "page_size": page_size,
         "field": "manifested_at",
         "direction": "DESC",
         "op": "GTE",
@@ -781,15 +789,115 @@ def _track_delhivery_order(order_id):
         "range_dispatch_count_op": "GTE",
         "range_dispatch_count_value": 0,
     })
+
+
+def _search_rows(term, page_size=5):
+    data = _d1_search(term, page_size)
     rows = data.get("results") if isinstance(data, dict) else None
-    if not isinstance(rows, list):
-        raise NotFound()
+    return [row for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
+
+
+# Order number -> AWB pairs seen while scanning, so repeat lookups skip the scan.
+# Delhivery's firewall blocks bursts of requests (403), so scans are small,
+# run one at a time, and never re-read an AWB whose order is already known.
+_ORDER_AWBS = {}
+_KNOWN_SERIALS = set()
+_MISSED_ORDERS = {}
+_ORDER_LOCK = threading.Lock()
+_SCAN_LOCK = threading.Lock()
+_SCAN_WORKERS = 4      # parallel requests during a scan
+_SCAN_BACK = 30        # serials checked below the newest shipped AWB
+_SCAN_AHEAD_MAX = 80   # hard cap on serials checked above it
+_SCAN_GAP = 6          # stop looking ahead after this many unused AWBs in a row
+_MISS_TTL = 600        # seconds before an order ID that was not found is scanned again
+
+
+def _awb_from_serial(serial):
+    """Delhivery AWBs end in a check digit: (serial - 1) mod 7."""
+    return f"{serial}{(serial - 1) % 7}"
+
+
+def _order_of_awb(awb):
+    try:
+        details = _d1_tool("get-shipment-details-by-awb", {"awb_number": awb})
+    except NotFound:
+        return None
+    if not isinstance(details, dict) or not details.get("awb_number"):
+        return None
+    order_number = str(details.get("order_number") or "").strip().upper()
+    if order_number:
+        with _ORDER_LOCK:
+            _ORDER_AWBS[order_number] = str(details["awb_number"])
+            _KNOWN_SERIALS.add(int(awb) // 10)
+    return order_number
+
+
+def _scan_serials(pool, serials, term):
+    """Read the AWBs for these serials; return (match found, list of hit/miss flags)."""
+    todo = [serial for serial in serials if serial not in _KNOWN_SERIALS]
+    results = dict.fromkeys(serials, True)
+    for serial, found in zip(todo, pool.map(_order_of_awb, [_awb_from_serial(s) for s in todo])):
+        results[serial] = bool(found)
+        if found == term:
+            return True, []
+    return False, [results[serial] for serial in serials]
+
+
+def _find_unshipped_order(order_id):
+    """Find an order that Delhivery's search does not list yet (not picked up).
+
+    The search only returns shipped parcels, but this account's AWBs are
+    issued in sequence. Starting from the newest shipped AWB, nearby AWBs are
+    read directly and matched on their order number.
+    """
     term = order_id.upper()
-    match = next((row for row in rows if str((row or {}).get("order_number") or "").upper() == term), None)
-    if not isinstance(match, dict) or not match.get("awb_number"):
-        raise NotFound()
-    shipment = _track_delhivery_one(match["awb_number"])
-    shipment["orderId"] = str(match.get("order_number") or order_id)
+    with _SCAN_LOCK:
+        with _ORDER_LOCK:
+            known = _ORDER_AWBS.get(term)
+            missed = _MISSED_ORDERS.get(term, 0)
+        if known:
+            return known
+        if time.monotonic() - missed < _MISS_TTL:
+            raise NotFound()
+        latest = [row.get("awb_number") for row in _search_rows("", 20)]
+        serials = [int(awb) // 10 for awb in latest if str(awb or "").isdigit() and len(str(awb)) >= 10]
+        if not serials:
+            raise NotFound()
+        anchor = max(serials)
+        from concurrent.futures import ThreadPoolExecutor
+
+        _token("d1", _d1_token)
+        with ThreadPoolExecutor(max_workers=_SCAN_WORKERS) as pool:
+            # Newer AWBs first: unshipped orders are usually the most recent ones.
+            ahead, misses = 1, 0
+            while ahead <= _SCAN_AHEAD_MAX and misses < _SCAN_GAP:
+                batch = list(range(anchor + ahead, anchor + ahead + _SCAN_WORKERS))
+                matched, flags = _scan_serials(pool, batch, term)
+                if matched:
+                    return _ORDER_AWBS[term]
+                for hit in flags:
+                    misses = 0 if hit else misses + 1
+                ahead += _SCAN_WORKERS
+            for start in range(0, _SCAN_BACK, _SCAN_WORKERS):
+                batch = list(range(anchor - start, anchor - start - _SCAN_WORKERS, -1))
+                matched, _ = _scan_serials(pool, batch, term)
+                if matched:
+                    return _ORDER_AWBS[term]
+        with _ORDER_LOCK:
+            _MISSED_ORDERS[term] = time.monotonic()
+    raise NotFound()
+
+
+def _track_delhivery_order(order_id):
+    """Find a Delhivery shipment by the order number shown in Delhivery One."""
+    term = order_id.upper()
+    match = next((row for row in _search_rows(order_id) if str(row.get("order_number") or "").upper() == term), None)
+    if match and match.get("awb_number"):
+        awb = str(match["awb_number"])
+    else:
+        awb = _find_unshipped_order(order_id)
+    shipment = _track_delhivery_one(awb)
+    shipment["orderId"] = shipment.get("orderId") or order_id
     return shipment
 
 
@@ -960,5 +1068,5 @@ def track_awb(raw):
         "ok": False,
         "code": "not_found",
         "checked": [CARRIER_NAMES[carrier] for carrier in configured],
-        "message": "No shipment was found for this tracking number.",
+        "message": "No shipment was found for this AWB or order ID.",
     }
