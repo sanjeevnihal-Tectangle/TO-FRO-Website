@@ -661,8 +661,7 @@
       return `<div class="track-step ${classes}"><span class="mark"></span>${escapeHtml(label)}</div>`;
     }).join('')}</div>`;
     const facts = [
-      ['Tracking number', shipment.awb],
-      ['Order ID', shipment.orderId],
+      ['Tracking number', shipment.orderId || shipment.awb],
       ['Current location', placeName(shipment.location)],
       ['Estimated delivery', shipment.eta]
     ].filter(([, value]) => value).map(([label, value]) => `<div class="track-fact"><small>${label}</small><b>${escapeHtml(value)}</b></div>`).join('');
