@@ -55,6 +55,9 @@ class SiteHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
+        if parsed.path == "/api/staff":
+            self._staff()
+            return
         if parsed.path != "/api/track":
             self.send_error(404)
             return
@@ -65,6 +68,32 @@ class SiteHandler(SimpleHTTPRequestHandler):
         except (UnicodeDecodeError, json.JSONDecodeError):
             awb = ""
         self._track(awb)
+
+    def _body(self):
+        length = int(self.headers.get("Content-Length") or 0)
+        raw = self.rfile.read(min(max(length, 0), 8000))
+        try:
+            data = json.loads(raw.decode("utf-8") or "{}")
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            data = {}
+        return data if isinstance(data, dict) else {}
+
+    def _staff(self):
+        if not _allowed(self.client_address[0]):
+            self._json(429, {"ok": False, "code": "busy", "message": "Too many requests. Please wait a moment."})
+            return
+        body = self._body()
+        action = str(body.get("action") or "")
+        if action == "login":
+            self._json(200, tracking.staff_login(body.get("email", ""), body.get("password", "")))
+            return
+        if action == "track":
+            if not tracking.staff_authorized(str(body.get("token") or "")):
+                self._json(200, {"ok": False, "code": "denied", "message": "Please sign in again."})
+                return
+            self._json(200, tracking.staff_track(body.get("awb", "")))
+            return
+        self._json(404, {"ok": False, "code": "invalid", "message": "Unknown request."})
 
     def _track(self, awb):
         ip = self.client_address[0]

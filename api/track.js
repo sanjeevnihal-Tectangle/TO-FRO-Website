@@ -352,10 +352,10 @@ async function scanForOrder(config, orderId) {
   return "";
 }
 
-async function searchShipments(config, term, pageSize) {
+async function searchShipments(config, term, pageSize, searchOn = ["oid"]) {
   const stamp = "2020-01-01T00:00:00+05:30";
   const data = await delhiveryTool(config, "shipment-search", {
-    search_on: ["oid"],
+    search_on: searchOn,
     search_term: term,
     search_type: "CONTAINS",
     page: 1,
@@ -617,3 +617,14 @@ function missing() {
 function unreachable() {
   return { ok: false, code: "unavailable", message: "The courier tracking service could not be reached. Please try again in a moment." };
 }
+
+export {
+  trackShipway,
+  trackDelhivery,
+  trackCourierWala,
+  delhiveryConfig,
+  delhiveryTool,
+  searchShipments,
+  missing,
+  unreachable,
+};

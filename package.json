@@ -1,5 +1,8 @@
 {
   "name": "to-fro",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "dev": "python serve.py 5510"
+  }
 }

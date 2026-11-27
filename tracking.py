@@ -7,6 +7,8 @@ does not find a shipment.
 """
 
 import base64
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -34,6 +36,16 @@ CARRIER_NAMES = {item["id"]: item["name"] for item in CARRIERS}
 
 _TOKEN_LOCK = threading.Lock()
 _TOKENS = {}
+_STAFF = threading.local()
+
+
+def _staff_note(kind, data):
+    """Keep the raw carrier record for the staff search running on this thread."""
+    if not getattr(_STAFF, "active", False) or not isinstance(data, dict):
+        return
+    bag = getattr(_STAFF, "bag", None)
+    if isinstance(bag, dict):
+        bag[kind] = data
 
 
 def load_env(path=None):
@@ -647,6 +659,8 @@ def _track_delhivery_one(awb):
             "location": _scan_place(label),
         })
     events.sort(key=lambda item: str(item.get("time") or ""), reverse=True)
+    _staff_note("delhivery", details)
+    _staff_note("history", history if isinstance(history, dict) else {})
     status = _pretty_status(details.get("unmapped_shipment_status") or details.get("shipment_status"))
     location = _scan_place(details.get("last_update")) or details.get("destination") or ""
     shipment = _shipment(
@@ -711,6 +725,7 @@ def _track_delhivery_public(awb):
     eta = ""
     if _tone(headline) != "ok":
         eta = item.get("promiseDeliveryDate") or item.get("deliveryDateText") or ""
+    _staff_note("delhivery_public", item)
     return _shipment("delhivery", item.get("awb") or awb, headline, location, eta, events)
 
 
@@ -748,6 +763,7 @@ def _track_delhivery(awb):
     shipment = (rows[0] or {}).get("Shipment") or {}
     if not shipment or not shipment.get("AWB"):
         raise NotFound()
+    _staff_note("delhivery_classic", shipment)
     current = shipment.get("Status") or {}
     events = []
     for scan in shipment.get("Scans") or []:
@@ -767,10 +783,10 @@ def _track_delhivery(awb):
     )
 
 
-def _d1_search(term, page_size=5):
+def _d1_search(term, page_size=5, search_on=None):
     stamp = "2020-01-01T00:00:00+05:30"
     return _d1_tool("shipment-search", {
-        "search_on": ["oid"],
+        "search_on": search_on or ["oid"],
         "search_term": term,
         "search_type": "CONTAINS",
         "page": 1,
@@ -1016,6 +1032,7 @@ def _track_courierwala_query(awb, query_type):
     vendor = _field(row, "VendorName", "Vendor", "CourierName", "Carrier", "Forwarder", "ServiceName")
     if vendor and not vendor.replace(" ", "").isdigit():
         shipment["carrierName"] = vendor
+    _staff_note("courierwala", row)
     return shipment
 
 
@@ -1111,6 +1128,7 @@ def _track_shipway(value, field="order_id"):
         shipment["carrierName"] = "FedEx" if carrier.lower() == "fedex" else carrier
     if order_id and order_id.upper() != str(shipment["awb"]).upper():
         shipment["orderId"] = order_id
+    _staff_note("shipway", response)
     return shipment
 
 
@@ -1196,3 +1214,365 @@ def track_awb(raw):
         "checked": [CARRIER_NAMES[carrier] for carrier in configured],
         "message": "No shipment was found for this AWB or order ID.",
     }
+
+
+def _staff_account():
+    email = (_env("STAFF_EMAIL") or "tonfrologistics@gmail.com").strip().lower()
+    password = _env("STAFF_PASSWORD") or "TonFro@2026"
+    return email, password
+
+
+def _staff_same(left, right):
+    return hmac.compare_digest(
+        hashlib.sha256(str(left).encode()).digest(),
+        hashlib.sha256(str(right).encode()).digest(),
+    )
+
+
+def _staff_sign(payload, password):
+    return hmac.new(str(password).encode(), str(payload).encode(), hashlib.sha256).hexdigest()
+
+
+def staff_login(email, password):
+    expected_email, expected_password = _staff_account()
+    if not _staff_same(str(email or "").strip().lower(), expected_email) or not _staff_same(password or "", expected_password):
+        return {"ok": False, "code": "denied", "message": "That email or password is not correct."}
+    expires = int(time.time()) + 12 * 60 * 60
+    payload = f"{expected_email}|{expires}"
+    return {"ok": True, "token": f"{payload}|{_staff_sign(payload, expected_password)}", "email": expected_email}
+
+
+def staff_authorized(token):
+    expected_email, expected_password = _staff_account()
+    parts = str(token or "").split("|")
+    if len(parts) != 3:
+        return False
+    email, expires, signature = parts
+    if email != expected_email:
+        return False
+    try:
+        if int(expires) < int(time.time()):
+            return False
+    except ValueError:
+        return False
+    return hmac.compare_digest(_staff_sign(f"{email}|{expires}", expected_password), signature)
+
+
+def staff_track(raw):
+    _STAFF.active = True
+    _STAFF.bag = {}
+    try:
+        result = track_awb(raw)
+        bag = dict(_STAFF.bag)
+    finally:
+        _STAFF.active = False
+        _STAFF.bag = {}
+    if not isinstance(result, dict) or not result.get("ok"):
+        return result
+    shipment = result.get("shipment")
+    if isinstance(shipment, dict):
+        try:
+            shipment["facts"] = _staff_facts(shipment, bag)
+        except (Unavailable, NotFound, LookupError, TimeoutError, ValueError, TypeError):
+            shipment["facts"] = []
+    return result
+
+
+def _staff_facts(shipment, bag):
+    facts = []
+    seen = set()
+
+    def add(label, value):
+        text = _staff_text(value)
+        if not text or label in seen:
+            return
+        seen.add(label)
+        facts.append({"label": label, "value": text})
+
+    add("Carrier", shipment.get("carrierName"))
+    rich = _staff_delhivery_row(shipment)
+    if isinstance(rich, dict):
+        _delhivery_facts(add, rich)
+    history = bag.get("history") if isinstance(bag.get("history"), dict) else None
+    if history is None and _d1_config() and shipment.get("awb"):
+        try:
+            history = _d1_tool("get-awb-transit-history", {"awb_number": str(shipment.get("awb"))})
+        except (NotFound, Unavailable, LookupError, TimeoutError):
+            history = None
+    if isinstance(history, dict):
+        add("Consignee", history.get("consignee_name"))
+        add("Consignee phone", history.get("consignee_phone"))
+        attempts = history.get("delivery_attempts")
+        if attempts is not None and str(attempts).strip() != "":
+            add("Delivery attempts", attempts)
+        add("Delivered on", _epoch_text(history.get("delivered_at")) or history.get("delivered_at_string"))
+    classic = bag.get("delhivery_classic")
+    if isinstance(classic, dict):
+        _classic_facts(add, classic)
+    public = bag.get("delhivery_public")
+    if isinstance(public, dict):
+        _public_facts(add, public)
+    courier = bag.get("courierwala")
+    if isinstance(courier, dict):
+        _courier_facts(add, courier)
+    shipway = bag.get("shipway")
+    if isinstance(shipway, dict):
+        _shipway_facts(add, shipway)
+    if not any(item["label"] == "Destination" for item in facts):
+        add("Current location", shipment.get("location"))
+    if shipment.get("eta"):
+        add("Estimated delivery", shipment.get("eta"))
+    return facts[:40]
+
+
+def _staff_delhivery_row(shipment):
+    if not _d1_config():
+        return None
+    awb = str(shipment.get("awb") or "").strip()
+    order_id = str(shipment.get("orderId") or "").strip()
+    queries = []
+    if awb:
+        queries.append((["wbn"], awb))
+    if order_id:
+        queries.append((["oid"], order_id))
+    if awb and awb.upper() != order_id.upper():
+        queries.append((["oid"], awb))
+    for search_on, term in queries:
+        try:
+            data = _d1_search(term, 5, search_on)
+        except (NotFound, Unavailable, LookupError, TimeoutError):
+            continue
+        rows = data.get("results") if isinstance(data, dict) else None
+        if not isinstance(rows, list):
+            continue
+        rows = [row for row in rows if isinstance(row, dict)]
+        for row in rows:
+            row_awb = str(row.get("awb_number") or "").upper()
+            row_order = str(row.get("order_number") or "").upper()
+            if awb and row_awb == awb.upper():
+                return row
+            if order_id and row_order == order_id.upper():
+                return row
+        if len(rows) == 1:
+            return rows[0]
+    return None
+
+
+def _staff_text(value):
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if value == 0:
+            return ""
+        if value > 10000000000:
+            return _epoch_text(value)
+        if float(value).is_integer():
+            return str(int(value))
+        return str(value)
+    text = str(value or "").strip()
+    if text.lower() in {"", "null", "none", "n/a", "na", "-", "0"}:
+        return ""
+    return text
+
+
+def _staff_address(block):
+    if not isinstance(block, dict):
+        return ""
+    name = " ".join(part for part in (_staff_text(block.get("first_name")), _staff_text(block.get("last_name"))) if part)
+    city_line = ", ".join(part for part in (
+        _staff_text(block.get("city")),
+        _staff_text(block.get("state")),
+        _staff_text(block.get("pin_code") or block.get("pincode")),
+    ) if part)
+    country = _staff_text(block.get("country"))
+    lines = [
+        name,
+        _staff_text(block.get("address_line1") or block.get("address_line") or block.get("address")),
+        _staff_text(block.get("address_line2")),
+        city_line,
+        "" if country.upper() == "IN" else country,
+        _staff_text(block.get("phone") or block.get("phone_number")),
+        _staff_text(block.get("email")),
+    ]
+    return "\n".join(line for line in lines if line)
+
+
+def _delhivery_facts(add, row):
+    customer = " ".join(part for part in (_staff_text(row.get("customer_first_name")), _staff_text(row.get("customer_last_name"))) if part)
+    add("Customer", customer)
+    add("Customer phone", row.get("customer_phone"))
+    add("Consignee", _staff_address(row.get("shipping_address")))
+    add("Billing address", _staff_address(row.get("billing_address")))
+    add("Origin", _staff_address(row.get("origin_address")))
+    add("Destination", row.get("destination"))
+    add("Pickup location", row.get("pickup_location_name"))
+    add("Seller", row.get("seller_name") or _staff_address(row.get("seller_address")))
+    add("Return address", _staff_address(row.get("return_address")))
+    add("Contents", row.get("product_description"))
+    add("Payment", _pretty_status(row.get("payment_mode")))
+    currency = _staff_text(row.get("currency")) or "INR"
+    amount = _staff_text(row.get("grand_total_value"))
+    if amount:
+        add("Shipment value", f"{currency} {amount}")
+    cod = _staff_text(row.get("cod_amount"))
+    if cod:
+        add("COD amount", f"{currency} {cod}")
+    add("Shipment type", _pretty_status(row.get("shipment_type")))
+    add("Package status", _pretty_status(row.get("package_status") or row.get("package_status_type")))
+    fragile = str(row.get("contains_fragile_items") or "").strip().upper()
+    if fragile in {"ON", "OFF"}:
+        add("Fragile", "Yes" if fragile == "ON" else "No")
+    weight = _staff_text(row.get("client_total_weight"))
+    if weight:
+        add("Weight", f"{weight} g")
+    add("Quantity", row.get("item_quantity") or row.get("box_count"))
+    boxes = row.get("box_list") if isinstance(row.get("box_list"), list) else []
+    box_text = "; ".join(part for part in (_box_text(box) for box in boxes) if part)
+    add("Package size", box_text)
+    add("Zone", row.get("zone"))
+    add("Delivery attempts", row.get("delivery_attempt_count"))
+    add("NDR status", _pretty_status(row.get("ndr_status")))
+    score = _staff_text(row.get("rto_score"))
+    if score and score.upper() != "NONE":
+        add("RTO score", _pretty_status(score))
+    add("Address check", _pretty_status(row.get("shipping_address_validity")))
+    add("Invoice number", row.get("invoice_number"))
+    add("Invoice date", _epoch_text(row.get("invoice_date")))
+    add("E-way bill", row.get("ewaybill_number"))
+    add("Promised delivery", _epoch_text(row.get("promised_delivery_date")))
+    add("Estimated delivery", _epoch_text(row.get("estimated_delivery_date")))
+    add("Picked up", _epoch_text(row.get("pickup_date")))
+    add("Delivered on", _epoch_text(row.get("delivered_date")))
+    add("Latest update", row.get("last_update") or row.get("remarks"))
+    add("Client", row.get("client_name"))
+
+
+def _box_text(box):
+    if not isinstance(box, dict):
+        return ""
+    weight = _staff_text(box.get("weight"))
+    unit = _staff_text(box.get("weight_unit")) or "GM"
+    length = _staff_text(box.get("length"))
+    breadth = _staff_text(box.get("breadth"))
+    height = _staff_text(box.get("height"))
+    dim_unit = _staff_text(box.get("length_unit")) or "CM"
+    parts = []
+    if weight:
+        parts.append(f"{weight} {unit.lower()}")
+    if length and breadth and height:
+        parts.append(f"{length} × {breadth} × {height} {dim_unit.lower()}")
+    mode = _pretty_status(box.get("shipping_mode"))
+    if mode:
+        parts.append(mode)
+    return ", ".join(parts)
+
+
+def _classic_facts(add, shipment):
+    consignee = shipment.get("Consignee") if isinstance(shipment.get("Consignee"), dict) else {}
+    name = _staff_text(consignee.get("Name"))
+    address = ", ".join(part for part in (
+        _staff_text(consignee.get("Address1") or consignee.get("Address")),
+        _staff_text(consignee.get("Address2")),
+        _staff_text(consignee.get("City")),
+        _staff_text(consignee.get("State")),
+        _staff_text(consignee.get("PinCode") or consignee.get("Pincode")),
+    ) if part)
+    add("Consignee", "\n".join(part for part in (name, address, _staff_text(consignee.get("Telephone"))) if part))
+    add("Origin", shipment.get("Origin"))
+    add("Destination", shipment.get("Destination"))
+    add("Payment", shipment.get("OrderType"))
+    add("COD amount", shipment.get("CODAmount"))
+    add("Shipment value", shipment.get("InvoiceAmount"))
+    add("Contents", shipment.get("ProductDesc") or shipment.get("ProductsDesc"))
+    sender = shipment.get("SenderName") or shipment.get("Shipper")
+    add("Shipper", sender if isinstance(sender, str) else "")
+
+
+def _public_facts(add, item):
+    for label, key in (
+        ("Consignee", "consigneeName"),
+        ("Consignee phone", "consigneePhone"),
+        ("Destination", "destination"),
+        ("Origin", "origin"),
+        ("Payment", "paymentMode"),
+        ("Contents", "productType"),
+    ):
+        add(label, item.get(key))
+
+
+_COURIER_LABELS = {
+    "origin": "Origin",
+    "destination": "Destination",
+    "consignee": "Consignee",
+    "receivername": "Receiver",
+    "receiver": "Receiver",
+    "receivertelephone": "Receiver phone",
+    "receivermobile": "Receiver phone",
+    "receiveraddress": "Receiver address",
+    "receiveraddress1": "Receiver address",
+    "shipper_name": "Shipper",
+    "shippername": "Shipper",
+    "shipperaddress": "Shipper address",
+    "shipperaddress1": "Shipper address",
+    "vendorname": "Handed to",
+    "vendor": "Handed to",
+    "vendorawbno1": "Vendor AWB",
+    "vendorawbno2": "Vendor AWB 2",
+    "weight": "Weight",
+    "actualweight": "Weight",
+    "chargedweight": "Charged weight",
+    "pcs": "Pieces",
+    "pieces": "Pieces",
+    "nop": "Pieces",
+    "service": "Service",
+    "servicename": "Service",
+    "goodsdesc": "Contents",
+    "description": "Contents",
+    "product": "Contents",
+    "content": "Contents",
+    "invoicevalue": "Invoice value",
+    "invoiceno": "Invoice number",
+    "bookingdate": "Booked on",
+}
+
+
+def _courier_facts(add, row):
+    folded = {str(key).lower(): value for key, value in row.items()}
+    for key, label in _COURIER_LABELS.items():
+        if key in folded:
+            add(label, folded[key])
+
+
+def _shipway_facts(add, response):
+    extra = response.get("extra_fields") if isinstance(response.get("extra_fields"), dict) else {}
+    name = _field(response, "customer_name", "name", "consignee") or " ".join(
+        part for part in (_field(response, "first_name"), _field(response, "last_name")) if part
+    )
+    add("Customer", name)
+    add("Customer phone", _field(response, "phone", "customer_phone", "mobile", "contact"))
+    add("Customer email", _field(response, "email", "customer_email"))
+    add("Origin", _field(response, "from", "pickup_city", "origin"))
+    add("Destination", _field(response, "to", "shipping_city", "destination"))
+    add("Contents", _field(response, "product", "products_name", "item_name") or _shipway_products(response))
+    add("Payment", _field(response, "payment_type", "payment_mode"))
+    add("Shipment value", _field(response, "order_total", "invoice_amount", "amount"))
+    add("Picked up", _field(response, "pickup_date"))
+    add("Estimated delivery", _field(extra, "expected_delivery_date"))
+
+
+def _shipway_products(response):
+    products = response.get("products") or response.get("items") or []
+    if isinstance(products, dict):
+        products = list(products.values())
+    if not isinstance(products, list):
+        return ""
+    names = []
+    for item in products:
+        if isinstance(item, str):
+            names.append(item)
+        elif isinstance(item, dict):
+            label = _field(item, "product", "name", "product_name", "item_name")
+            qty = _field(item, "qty", "quantity")
+            if label:
+                names.append(f"{label} × {qty}" if qty else label)
+    return ", ".join(names)
